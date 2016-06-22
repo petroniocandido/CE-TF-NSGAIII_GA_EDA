@@ -1,3 +1,13 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%	         COMPUTAÇÃO EVOLUCIONÁRIA - TRABALHO FINAL     
+%	Programa de Pós Graduação em Engenharia Elétrica - PPGEE
+%	Universidade Federal de Minas Gerais - UFMG
+%
+%	Prof.: João Vasconcelos
+%	Aluno: Petrônio Cândido de Lima e Silva
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 % Aplicação aos Problemas DTLZ1 e DTLZ2 com 3 e 5 objetivos
 
 % Entradas:
@@ -16,36 +26,131 @@
 function [xBest, yBest, IGDbest, IGDmed, IGDworst] = petronio_candido(naval, optP, nobj, nexec)
 end
 
-function flag = domina(ObjSol1,ObjSol2)
-      
-% ObjSol1 -> vetor com valores de avaliação das funções objetos do indivíduo 1
-% ObjSol2 -> vetor com valores de avaliação das funções objetos do indivíduo 2
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% GERA ALEATORIAMENTE A POPULAÇÃO INICIAL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    % Se as soluções são incomparáveis, retorna 0
+function P  = geraPopulacaoInicial(nbpop, nvar, ncol)
+	P = zeros(nbpop, ncol);
+    lim_inf = -5.12;
+    lim_sup = 5.12;
+
+	% Gera uma matriz de valores aleatórios no intervalo [lim_inf, lim_sup]
+    P(:,1:nvar) = ((lim_sup - lim_inf).*rand(nbpop, nvar) + lim_inf);
+       
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% [Pnew] = avaliarPopulacao(Pold, nbpop, nvar, nobj, tipo) 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function Pnew = avaliarPopulacao(Pold, nbpop, nvar, nobj, tipo) 
+	if tipo == 1
+        Pnew = avaliarPopulacaoDTLZ1 (Pold,nbpop,nvar,nobj);
+    else
+        Pnew = avaliarPopulacaoDTLZ2 (Pold,nbpop,nvar,nobj);
+    end
+end
+
+% Funcao de Avaliação - DTLZ1
+function Pnew = avaliarPopulacaoDTLZ1 (Pold,nbpop,nvar,nobj)
+    
+    k=5;
+    f = zeros(1,nobj);
+    
+    for ind=1:nbpop
+
+        x = Pold(ind,:);
+    
+        s = 0;
+
+        for i = nobj:nvar
+            s = s + (x(i)-0.5)^2 - cos(20*pi*(x(i)-0.5));
+        end
+
+        g = 100*(k+s);
+
+        f(1) = 0.5 * prod(x(1:nobj-1)) * (1+g);
+        
+        for i = 2:nobj-1
+            f(i) = 0.5 * prod(x(1:nobj-i)) * (1-x(nobj-i+1)) * (1+g);
+        end
+
+        f(nobj) = 0.5 * (1-x(1)) * (1+g);
+        
+        Pnew(ind,nvar+1:nvar+nobj) = f;
+        
+    end
+end
+
+% Funcao de Avaliação - DTLZ2
+function Pnew = avaliarPopulacaoDTLZ2 (Pold,nbpop,nvar,nobj)
+    
+    k=10;
+    f = zeros(1,nobj);
+
+    for ind=1:nbpop
+        
+        x = Pold(ind,:);
+
+        s = 0;
+        
+        for i = nobj:nvar
+            s = s + (x(i)-0.5)^2;
+        end
+        
+        g = s;
+
+        cosx = cos(x*pi/2);
+        sinx = sin(x*pi/2);
+
+        f(1) =  (1+g) * prod(cosx(1:nobj-1));
+        
+        for i = 2:nobj-1
+            f(i) = (1+g) * prod(cosx(1:nobj-i)) * sinx(nobj-i+1);
+        end
+        
+        f(nobj) = (1+g) * sinx(1);
+        Pnew(ind,nvar+1:nvar+nobj) = f;
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% FUNÇÃO DE DOMINÂNCIA
+% flag = 0 - as soluções são incomparáveis
+% flag = 1 - u domina v
+% flag = 2 - v domina u
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+function flag = domina(u,v)
+
+    % As soluções são incomparáveis
     flag = 0;
     
-    % Se houver relação de dominância, retorna o indice indicando o indivíduo dominante
-    
-    % a) solução 1 domina a solução 2
-    if all(ObjSol2 >= ObjSol1) && any(ObjSol1 < ObjSol2)
+    % u domina v
+    if all(u >= v) && any(u < v)
        flag = 1;
         
-    % b) solução 2 domina a solução 1
-    elseif all(ObjSol1 >= ObjSol2) && any(ObjSol2 < ObjSol1)
+    % v domina u
+    elseif all(u >= v) && any(v < u)
        flag = 2;
     end
     
 end
 
-function xPoP = FastNonDominatedSort(xPoP, nobj, nvar, npop)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% FAST NON DOMINATED SORTING
+% Ordena a População Baseado em Não Dominância
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function P = FastNonDominatedSort(P, nobj, nvar, nbpop)
 
     % Indivíduos não dominados recebem rank = 1;
     % Indivíduos da segunda fronteira recebem rank = 2;
     % E assim sucessivamente...
     % Após ordenar fronteiras, calcula a distância de aglomeração para cada frente.
  
-    % Non-Dominated Sort: Ordena a População Baseado em Não Dominância
-
     % inicializa primeira frente (não dominada)  
     frente = 1;
     F(frente).f = [];
@@ -58,22 +163,22 @@ function xPoP = FastNonDominatedSort(xPoP, nobj, nvar, npop)
     %    dois a dois, e identifica a frente de não dominância.
 
     % para cada individuo "i" da população...
-    for i = 1:npop
+    for i = 1:nbpop
 
         individuo(i).n = 0;     % número de indivíduos que dominam "i" 
         individuo(i).p = [];    % conjunto que guardará todos indivíduos que "i" domina;
 
         % toma valores das funções objetivo para o indivíduo "i"
-        Obj_Xi = xPoP(i,nvar+1:nvar+nobj);
+        xi = P(i,nvar+1:nvar+nobj);
 
         % para cada individuo "j" da população...
-        for j = 1:npop
+        for j = 1:nbpop
 
             % toma valores das funções objetivo para o indivíduo "j"
-            Obj_Xj = xPoP(j,nvar+1:nvar+nobj);
+            xj = P(j,nvar+1:nvar+nobj);
 
             % verifica dominância
-            flag = domina(Obj_Xi,Obj_Xj);
+            flag = domina(xi,xj);
 
             % se "j" domina "i": incrementa o número de indivíduos que o dominam;
             if flag == 2
@@ -88,7 +193,7 @@ function xPoP = FastNonDominatedSort(xPoP, nobj, nvar, npop)
         % se solução não for dominada por nenhuma outra... 
         % esta solução pertence a frente não dominada (rank=1)
         if individuo(i).n == 0
-            xPoP(i, pos) = 1;                   % guarda rank na população
+            P(i, pos) = 1;                   % guarda rank na população
             F(frente).f = [F(frente).f i];      % salva individuo da frente não dominada
         end
     end
@@ -115,7 +220,7 @@ function xPoP = FastNonDominatedSort(xPoP, nobj, nvar, npop)
                    % verifica que nenhum dos individuos nas fronteiras subsequentes dominam "q"
                    if individuo(individuo(F(frente).f(i)).p(j)).n == 0
 
-                        xPoP(individuo(F(frente).f(i)).p(j),pos) = frente + 1;   % guarda rank do indivíduo
+                        P(individuo(F(frente).f(i)).p(j),pos) = frente + 1;   % guarda rank do indivíduo
                         Qf = [Qf individuo(F(frente).f(i)).p(j)];                % salva indivíduo da frente não dominada atual
                    end                
                end
@@ -131,25 +236,25 @@ function xPoP = FastNonDominatedSort(xPoP, nobj, nvar, npop)
     end
 end
 
-%--------------------
-% Função para Cálculo da Distância de Multidão
-function xPoP = CrowdingDistance(xPoP, nobj, nvar, nsel)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% CROWDING DISTANCE
+% Função para Cálculo da Distância de Multidão: distância para as soluções vizinhas em cada dimensão do espaço de busca
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    % Crowding Distance: Calcula distância de multidão 
-    % (distância para as soluções vizinhas em cada dimensão do espaço de busca)
+function P = CrowdingDistance(P, nobj, nvar, nsel)
 
     % posição com informação do rank (número da frente de dominância)
     pos = nobj + nvar + 1;    
 
     % ordena individuos da população conforme nível de dominância
-    [~,indice_fr] = sort(xPoP(:,pos));
-    xPoP = xPoP(indice_fr,:);
+    [~,indice_fr] = sort(P(:,pos));
+    P = P(indice_fr,:);
        
     % verifica qual a ultima frente de dominância a entrar diretamente na população de pais
-    lastF =  xPoP(nsel,pos);
+    lastF =  P(nsel,pos);
     
     % verifica qual o pior rank de frente de não dominância na população
-    worstF = max(xPoP(:,pos));
+    worstF = max(P(:,pos));
     
     % encontra a distância de multidão para cada indivíduo das frentes de dominância selecionadas
     for frente = 1:lastF
@@ -163,16 +268,16 @@ function xPoP = CrowdingDistance(xPoP, nobj, nvar, nsel)
 
         % indice do último indivíduo pertencente a fronteira
         if frente~=lastF || lastF < worstF
-            indice_fim = find(xPoP(:,pos)>frente,1)-1;    
+            indice_fim = find(P(:,pos)>frente,1)-1;    
         else
-            indice_fim = length(xPoP);
+            indice_fim = length(P);
         end
         
         % número de soluções na frente
         nsolFi = indice_fim-indice_ini+1;
 
         % separa apenas as avaliações de função objetivo dos individuos na fronteira Fi
-        xPop_Fi = xPoP(indice_ini:indice_fim, nvar+1:nvar+nobj);
+        P_Fi = P(indice_ini:indice_fim, nvar+1:nvar+nobj);
 
         % inicializa vetor com valor nulo para as distâncias de multidão
         Di=zeros(1,nsolFi);
@@ -181,13 +286,13 @@ function xPoP = CrowdingDistance(xPoP, nobj, nvar, nsel)
         for i = 1 : nobj
 
             % ordena indivíduos da fronteira baseado no valor do objetivo "i"  
-            [~, indice_obj] = sort(xPop_Fi(:,i));
+            [~, indice_obj] = sort(P_Fi(:,i));
             
             % maior valor para o objetivo "i" - último indice
-            f_max = xPop_Fi(indice_obj(end),i);
+            f_max = P_Fi(indice_obj(end),i);
 
             % menor valor para o objetivo "i" - primeiro indice
-            f_min = xPop_Fi(indice_obj(1),i);
+            f_min = P_Fi(indice_obj(1),i);
 
             % atribui valor "infinito" para indivíduos na extremidade ótima da fronteira Fi
             Di(1,indice_obj(1)) = Di(1,indice_obj(1)) + Inf;
@@ -197,13 +302,13 @@ function xPoP = CrowdingDistance(xPoP, nobj, nvar, nsel)
 
                 % identifica valores da função objetivos das soluções vizinhas
                 if j~=nsolFi
-                    proximo   = xPop_Fi(indice_obj(j+1),i);
+                    proximo   = P_Fi(indice_obj(j+1),i);
                 else
                     % no extremo máximo, soma o semiperimetro apenas entre o único vizinho
-                    proximo   = xPop_Fi(indice_obj(j),i);
+                    proximo   = P_Fi(indice_obj(j),i);
                 end
 
-                anterior  = xPop_Fi(indice_obj(j-1),i);
+                anterior  = P_Fi(indice_obj(j-1),i);
 
                 % calcula semi-perimetro normalizado
                 Di(1,indice_obj(j)) = Di(1,indice_obj(j))+(proximo - anterior)/(f_max - f_min);
@@ -211,25 +316,25 @@ function xPoP = CrowdingDistance(xPoP, nobj, nvar, nsel)
         end
 
         % guarda distâncias calculadas por individuo
-        xPoP(indice_ini:indice_fim,pos+1)=Di';
+        P(indice_ini:indice_fim,pos+1)=Di';
 
         % ordena individuos da frente conforme distância de multidão
         [~,indice_fr] = sort(Di,'descend');
-        xPoP(indice_ini:indice_fim,:) = xPoP(indice_fr+(indice_ini-1),:);
+        P(indice_ini:indice_fim,:) = P(indice_fr+(indice_ini-1),:);
     end
     
     % seleciona apenas o valor 'nsel' de soluções
-    xPoP = xPoP(1:nsel,:);
+    P = P(1:nsel,:);
 end
 
-%--------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Funcao para Cálculo da Distância Geracional Invertida (IGD)
+% pareto - Soluções da Fronteira de Pareto
+% solucao - Soluções não dominadas obtidas pelo algoritmo em teste
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 function IGD = CalculaIGD(pareto, solucao)
     
-    % entradas:
-    % pareto - Soluções da Fronteira de Pareto
-    % solucao - Soluções não dominadas obtidas pelo algoritmo em teste
-
     npareto = length(pareto);   % núm. de soluções da fronteira de Pareto
     nsol = length(solucao);     % núm. de soluções obtidas pelo algoritmo desenvolvido
     
