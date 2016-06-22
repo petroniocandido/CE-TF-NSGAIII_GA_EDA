@@ -11,30 +11,28 @@
 % Aplicação aos Problemas DTLZ1 e DTLZ2 com 3 e 5 objetivos
 
 % Entradas:
-%  naval -> número de avaliações da função objetivo
-%  problema  -> seleção do problema: 1 - DTLZ1 / Outros - DTLZ2
-%  nobj  -> número de objetivos (3 ou 5 objetivos)
-%  nexec -> número de execuções do algortimo para solução do problema
+%  naval 	= número de avaliações da função objetivo
+%  problema	= seleção do problema: 1 - DTLZ1 / Outros - DTLZ2
+%  nobj		= número de objetivos (3 ou 5 objetivos)
+%  nexec	= número de execuções do algortimo para solução do problema
 
 % Saídas:
-%  xBest   -> matriz contendo as váriaveis dos individuos não dominados da execução com melhor IGD
-%  yBest   -> matriz contendo a avaliação das funções objetivo para cada individuo de iBest
-%  IGDbest -> melhor valor de IGD obtido (relativo a xBest)
-%  IGDmed  -> média dos valores de IGD obtidos para as 'nexec' execuções
-%  IGDwort -> pior valor de IGD obtido
+%  xBest	= matriz contendo as váriaveis dos individuos não dominados da execução com melhor IGD
+%  yBest	= matriz contendo a avaliação das funções objetivo para cada individuo de iBest
+%  igd_max	= melhor valor de IGD obtido (relativo a xBest)
+%  igd_mean	= média dos valores de IGD obtidos para as 'nexec' execuções
+%  igd_min	= pior valor de IGD obtido
 
 % P = [ nvar , nobj , frente , penalidades ] x nbpop
 
-function [xBest, yBest, IGDbest, IGDmed, IGDworst] = petronio_candido(naval, problema, nobj, nexec)
+function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, problema, nobj, nexec)
 	NCOL = nvar + nobj + 2;
 	
 	% CR - CONSTANTE DE CRUZAMENTO
-    DPC = 1;
-    PC = DPC;
+    PC = 1;
     
     % CM - CONSTANTE DE MUTAÇÃO
-    DPM = 0.5;
-    PM = DPM;
+    PM = 0.5;
     
     % número de individuos da população
 	if nobj == 3
@@ -49,6 +47,8 @@ function [xBest, yBest, IGDbest, IGDmed, IGDworst] = petronio_candido(naval, pro
 	else
 		nvar = 10;
 	end
+	
+	ixObjetivos = nvar + nobj;
 	
 	% número de gerações
 	ngen= round(naval/NBPOP);
@@ -69,16 +69,79 @@ function [xBest, yBest, IGDbest, IGDmed, IGDworst] = petronio_candido(naval, pro
 			geracao = geracao + 1;
 			
 			% SELEÇÃO
+			% Q = (...)
 			
 			% CRUZAMENTO
+			% Q = (...)
 			
 			% MUTAÇÃO
+			% Q = (...)
 			
+			% AVALIAR POPULAÇÃO
+			Q = avaliarPopulacao(Q, NBPOP, nvar, nobj, problema);
 			
+			% S = P U Q
+			S = [P(:,1:(nvar+nobj));Q];
+			
+			% Ordena individuos por frentes de não dominância
+			S = FastNonDominatedSort(S,nobj,nvar,NBPOP*2);
+			
+			% Calcula distância de multidão e seleciona 50% dos melhores indivíduos em St
+			P = CrowdingDistance(S,nobj,nvar,NBPOP);
 			
 		end
 		
+		% verifica o número de soluções não dominadas finais obtidas
+		if P(end,ixObjetivos+1) == 1
+			nnd = npop;
+		else
+			nnd = find(P(:,ixObjetivos+1)>1,1)-1;   
+		end
+			
+		solucoes_var = P(1:nnd,1:nvar);            % valores das variáveis de busca para a solução final
+		solucoes_obj = P(1:nnd,nvar+1:ixObjetivos);  % variáveis da solução final
+				
+		% Calcula IGD das Soluções
+		if optP == 1 && nobj==3        
+		   load('dtlz1_3d.mat');
+		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
+
+		elseif optP == 1 && nobj==5        
+		   load('dtlz1_5d.mat');
+		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
+		   
+		elseif optP ~= 1 && nobj==3          
+		   load('dtlz2_3d.mat');
+		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
+		   
+		else
+		   load('dtlz2_5d.mat');
+		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);       
+		end   
+			
+	%     % plota solução final
+	%     figure()
+	%     hold off
+	%     plot3(sol_obj(:,1),sol_obj(:,2),sol_obj(:,3),'or');
+	%     hold on
+	%     plot3(fronteiraReal(:,1),fronteiraReal(:,2),fronteiraReal(:,3),'*b');
+		
+		sfinal(Solucao).var = solucoes_var;
+		sfinal(Solucao).obj = solucoes_obj;
+		
     end
+    %  Retorna atributos requisitados:
+    
+    % a) melhor solução
+    [igd_max,id] = min(igd);        
+    xBest = sfinal(id).var;        % variáveis    
+    yBest = sfinal(id).obj;        % objetivos 
+    
+    % IGD médio
+    igd_mean = mean(igd);
+    
+    % Pior IGD
+    igd_min = max(igd);
     
 end
 
