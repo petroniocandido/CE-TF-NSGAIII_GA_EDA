@@ -30,7 +30,7 @@ for optP = [1]
         % chamada da função
         t = cputime();
         
-        [xbest, ybest, IGDbest, IGDmean, IGDworst] = arthur_farah(naval, optP, nobj, nexec);
+        [xbest, ybest, IGDbest, IGDmean, IGDworst] = petronio_candido(naval, optP, nobj, nexec);
         
         t = cputime() - t;
         

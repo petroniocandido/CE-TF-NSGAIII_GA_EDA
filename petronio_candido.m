@@ -26,7 +26,6 @@
 % P = [ nvar , nobj , frente , penalidades ] x nbpop
 
 function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, problema, nobj, nexec)
-	NCOL = nvar + nobj + 2;
 	
 	% CR - CONSTANTE DE CRUZAMENTO
     PC = 1;
@@ -48,7 +47,15 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		nvar = 10;
 	end
 	
-	ixObjetivos = nvar + nobj;
+	NCOL = nvar + nobj + 2;
+	
+	% Ìndices da matriz P
+	
+	ixVariaveis = 1 : nvar;
+	
+	ixObjetivos = nvar +1 : nvar + nobj;
+	
+	ixRanking = nvar + nobj + 1;
 	
 	% número de gerações
 	ngen= round(naval/NBPOP);
@@ -65,17 +72,19 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		P = FastNonDominatedSort(P,nobj,nvar,NBPOP);
 		P = CrowdingDistance(P,nobj,nvar,NBPOP);
 		
+		geracao = 0;
+		
 		while geracao <= ngen 
-			geracao = geracao + 1;
+			geracao = geracao + 1
 			
 			% SELEÇÃO
-			% Q = (...)
+			Q = selecao_torneio(P, NBPOP, nvar, NCOL, 1);
 			
 			% CRUZAMENTO
-			% Q = (...)
+			Q = cruzamento(Q, NBPOP, nvar, nobj, PC);
 			
 			% MUTAÇÃO
-			% Q = (...)
+			Q = mutacao(Q, NBPOP, nvar, NCOL, PM);
 			
 			% AVALIAR POPULAÇÃO
 			Q = avaliarPopulacao(Q, NBPOP, nvar, nobj, problema);
@@ -86,31 +95,33 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			% Ordena individuos por frentes de não dominância
 			S = FastNonDominatedSort(S,nobj,nvar,NBPOP*2);
 			
+			S(:,ixRanking)
+			
 			% Calcula distância de multidão e seleciona 50% dos melhores indivíduos em St
 			P = CrowdingDistance(S,nobj,nvar,NBPOP);
 			
 		end
 		
 		% verifica o número de soluções não dominadas finais obtidas
-		if P(end,ixObjetivos+1) == 1
+		if P(end,ixRanking) == 1
 			nnd = npop;
 		else
-			nnd = find(P(:,ixObjetivos+1)>1,1)-1;   
+			nnd = find(P(:,ixRanking)>1,1)-1;   
 		end
 			
-		solucoes_var = P(1:nnd,1:nvar);            % valores das variáveis de busca para a solução final
-		solucoes_obj = P(1:nnd,nvar+1:ixObjetivos);  % variáveis da solução final
+		solucoes_var = P(1:nnd,ixVariaveis);  % valores das variáveis de busca para a solução final
+		solucoes_obj = P(1:nnd,ixObjetivos);  % variáveis da solução final
 				
 		% Calcula IGD das Soluções
-		if optP == 1 && nobj==3        
+		if problema == 1 && nobj==3        
 		   load('dtlz1_3d.mat');
 		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
 
-		elseif optP == 1 && nobj==5        
+		elseif problema == 1 && nobj==5        
 		   load('dtlz1_5d.mat');
 		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
 		   
-		elseif optP ~= 1 && nobj==3          
+		elseif problema ~= 1 && nobj==3          
 		   load('dtlz2_3d.mat');
 		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
 		   
@@ -128,6 +139,8 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		
 		sfinal(Solucao).var = solucoes_var;
 		sfinal(Solucao).obj = solucoes_obj;
+		
+		Solucao
 		
     end
     %  Retorna atributos requisitados:
@@ -274,7 +287,7 @@ function P = FastNonDominatedSort(P, nobj, nvar, nbpop)
 
 	% índices na matriz de população P
     ixRanking = nobj + nvar + 1;     %frente de dominância
-    ixObj = nvar + nobj;		%final da faixa de objetivos
+    ixObj = nvar + 1 : nvar + nobj;		%final da faixa de objetivos
 
     % 1) Compara a dominância entre todos os individuos da população, 
     %    dois a dois, e identifica a frente de não dominância.
@@ -286,13 +299,13 @@ function P = FastNonDominatedSort(P, nobj, nvar, nbpop)
         individuo(i).p = [];    % conjunto que guardará todos indivíduos que "i" domina;
 
         % toma valores das funções objetivo para o indivíduo "i"
-        xi = P(i,nvar+1:ixObj);
+        xi = P(i,ixObj);
 
         % para cada individuo "j" da população...
         for j = 1:nbpop
 
             % toma valores das funções objetivo para o indivíduo "j"
-            xj = P(j,nvar+1:ixObj);
+            xj = P(j,ixObj);
 
             % verifica dominância
             flag = domina(xi,xj);
@@ -450,7 +463,7 @@ end
 % solucao - Soluções não dominadas obtidas pelo algoritmo em teste
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function IGD = CalculaIGD(pareto, solucao)
+function igd = IGD(pareto, solucao)
     
     npareto = length(pareto);   % núm. de soluções da fronteira de Pareto
     nsol = length(solucao);     % núm. de soluções obtidas pelo algoritmo desenvolvido
@@ -469,6 +482,143 @@ function IGD = CalculaIGD(pareto, solucao)
     end
     
     % realiza a média das menores distâncias
-    IGD = mean(dmin);
+    igd = mean(dmin);
 end
  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% OPERADOR DE CRUZAMENTO
+%
+% [PNew, nc] = cruzamento(POld, nbpop, nvar, cr)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function PNew = cruzamento(POld, nbpop, nvar, nobj, pc)
+	PNew = POld;
+    
+    [r, c] = size(POld);
+    
+    cruzamentos = r * pc;
+    
+    alpha_pol = 0.9;	% Coef. de multiplicação linear polarizado
+    
+    alpha = 0.5;		% Coef. de multiplicação linear 
+    
+    for ix = 1:cruzamentos
+    	    	
+		dir = randi([0, 1]);	% Direção do cruzamento
+		
+		kcross = randi([1, nvar]);	% Ponto de corte
+		
+		% Seleção aleatória dos indivíduos para cruzamento
+		[i,j] = escolhe2(POld,r,nvar+nobj+1);
+		
+		if dir == 0
+			tmp1 = (alpha_pol * POld(i, 1:kcross)) + ((1-alpha_pol) * POld(j, 1:kcross));
+			f1 =  [tmp1, POld(i, kcross+1:nvar)];
+			tmp2 = ((1-alpha) * POld(i, 1:kcross)) + (alpha * POld(j, 1:kcross));
+			f2 =  [tmp2, POld(j, kcross+1:nvar)];
+		else
+			tmp1 = (alpha_pol * POld(i, kcross:nvar)) + ((1-alpha_pol) * POld(j, kcross:nvar));
+			f1 =  [POld(i, 1:kcross-1), tmp1];
+			tmp2 = ((1-alpha) * POld(i, kcross:nvar)) + (alpha * POld(j, kcross:nvar));
+			f2 =  [POld(j, 1:kcross-1), tmp2];
+		end
+					
+		PNew(i,1:nvar) = f1;
+		PNew(j,1:nvar) = f2;
+		
+	end
+
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% OPERADOR DE MUTAÇÃO
+%
+% [PNew, nc] = mutacao(POld, nbpop, nvar, cm)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function PNew = mutacao(POld, nbpop, nvar, ncol, pm)
+	%PNew = zeros(nbpop, ncol);
+    PNew = POld;
+    [R, s] = size(POld);
+    for i = 1:R
+    
+		r = rand();
+		
+		if r < pm
+		
+			if exist('vrange')
+				clear vrange;
+			end
+		
+			dir = randi([0, 1]);	% Direção da mutação
+			
+			kmut = randi(nvar - dir);	% Ponto de mutação
+			
+			if dir == 0
+				for k = 1:kmut
+					vrange(k) = max(POld(:,k)) - min(POld(:,k));
+					if vrange(k) < 0.2
+						vrange(k) = rand();
+					end
+				end
+			else
+				for k = kmut:nvar
+					vrange(k-(kmut-1)) = max(POld(:,k)) - min(POld(:,k));
+					if vrange(k-(kmut-1)) < 0.2
+						vrange(k-(kmut-1)) = rand();
+					end
+				end
+			end
+    
+			beta = -1*rand() + rand(); %2.0*rand()-1.0;
+			
+			gamma = beta*vrange;
+			
+			if dir == 0	
+				PNew(i,1:kmut) = POld(i,1:kmut) + gamma;
+				%PNew(i,kmut+1:ncol) = POld(i,kmut+1:ncol)
+			else
+				PNew(i,kmut:nvar) = POld(i,kmut:nvar) + gamma;
+				%PNew(i,1:kmut-1) = POld(i,1:kmut-1)
+			end
+		end
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ESCOLHE 2 INDIVÍDUOS ALEATÓRIOS NA POPULAÇÃO TAL QUE d(I) < d(J)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [I, J] = escolhe2(P,nbpop,ixRanking)
+	a = randi(nbpop);	
+	b = randi(nbpop);
+			
+	if P(a,ixRanking) < P(b,ixRanking)
+		I = a;
+		J = b;
+	else
+		I = b;
+		J = a;
+	end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ESCOLHE 2 INDIVÍDUOS ALEATÓRIOS NA POPULAÇÃO TAL QUE d(I) < d(J)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+function PNew = selecao_torneio(POld, nbpop, nvar, ncol, ps)
+    num_selecionados = nbpop * ps;
+    
+    k = 0.65;
+    
+    for ix = 1:num_selecionados
+		[i,j] = escolhe2(POld,nbpop,nvar);
+		r = rand();
+		if r < k
+			PNew(ix,:) = POld(i,:);
+		else
+			PNew(ix,:) = POld(j,:);
+		end
+    end
+end
