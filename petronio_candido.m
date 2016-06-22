@@ -23,7 +23,11 @@
 %  IGDmed  -> média dos valores de IGD obtidos para as 'nexec' execuções
 %  IGDwort -> pior valor de IGD obtido
 
+% P = [ nvar , nobj , frente , penalidades ] x nbpop
+
 function [xBest, yBest, IGDbest, IGDmed, IGDworst] = petronio_candido(naval, optP, nobj, nexec)
+	ncol = nvar + nobj + 1;
+	nbpop = 100;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -32,11 +36,8 @@ end
 
 function P  = geraPopulacaoInicial(nbpop, nvar, ncol)
 	P = zeros(nbpop, ncol);
-    lim_inf = -5.12;
-    lim_sup = 5.12;
-
-	% Gera uma matriz de valores aleatórios no intervalo [lim_inf, lim_sup]
-    P(:,1:nvar) = ((lim_sup - lim_inf).*rand(nbpop, nvar) + lim_inf);
+    
+    P(:,1:nvar) = rand(nbpop, nvar);
        
 end
 
@@ -156,8 +157,9 @@ function P = FastNonDominatedSort(P, nobj, nvar, nbpop)
     F(frente).f = [];
     individuo = [];
 
-    % posição para para guardar dados de rank (número da frente de dominância)
-    pos = nobj + nvar + 1;      
+	% índices na matriz de população P
+    ixRanking = nobj + nvar + 1;     %frente de dominância
+    ixObj = nvar + nobj;		%final da faixa de objetivos
 
     % 1) Compara a dominância entre todos os individuos da população, 
     %    dois a dois, e identifica a frente de não dominância.
@@ -169,13 +171,13 @@ function P = FastNonDominatedSort(P, nobj, nvar, nbpop)
         individuo(i).p = [];    % conjunto que guardará todos indivíduos que "i" domina;
 
         % toma valores das funções objetivo para o indivíduo "i"
-        xi = P(i,nvar+1:nvar+nobj);
+        xi = P(i,nvar+1:ixObj);
 
         % para cada individuo "j" da população...
         for j = 1:nbpop
 
             % toma valores das funções objetivo para o indivíduo "j"
-            xj = P(j,nvar+1:nvar+nobj);
+            xj = P(j,nvar+1:ixObj);
 
             % verifica dominância
             flag = domina(xi,xj);
@@ -193,7 +195,7 @@ function P = FastNonDominatedSort(P, nobj, nvar, nbpop)
         % se solução não for dominada por nenhuma outra... 
         % esta solução pertence a frente não dominada (rank=1)
         if individuo(i).n == 0
-            P(i, pos) = 1;                   % guarda rank na população
+            P(i, ixRanking) = 1;                   % guarda rank na população
             F(frente).f = [F(frente).f i];      % salva individuo da frente não dominada
         end
     end
@@ -220,7 +222,7 @@ function P = FastNonDominatedSort(P, nobj, nvar, nbpop)
                    % verifica que nenhum dos individuos nas fronteiras subsequentes dominam "q"
                    if individuo(individuo(F(frente).f(i)).p(j)).n == 0
 
-                        P(individuo(F(frente).f(i)).p(j),pos) = frente + 1;   % guarda rank do indivíduo
+                        P(individuo(F(frente).f(i)).p(j),ixRanking) = frente + 1;   % guarda rank do indivíduo
                         Qf = [Qf individuo(F(frente).f(i)).p(j)];                % salva indivíduo da frente não dominada atual
                    end                
                end
@@ -244,17 +246,17 @@ end
 function P = CrowdingDistance(P, nobj, nvar, nsel)
 
     % posição com informação do rank (número da frente de dominância)
-    pos = nobj + nvar + 1;    
+    ixRanking = nvar + nobj + 1;    
 
     % ordena individuos da população conforme nível de dominância
-    [~,indice_fr] = sort(P(:,pos));
+    [~,indice_fr] = sort(P(:,ixRanking));
     P = P(indice_fr,:);
        
     % verifica qual a ultima frente de dominância a entrar diretamente na população de pais
-    lastF =  P(nsel,pos);
+    lastF =  P(nsel,ixRanking);
     
     % verifica qual o pior rank de frente de não dominância na população
-    worstF = max(P(:,pos));
+    worstF = max(P(:,ixRanking));
     
     % encontra a distância de multidão para cada indivíduo das frentes de dominância selecionadas
     for frente = 1:lastF
@@ -268,7 +270,7 @@ function P = CrowdingDistance(P, nobj, nvar, nsel)
 
         % indice do último indivíduo pertencente a fronteira
         if frente~=lastF || lastF < worstF
-            indice_fim = find(P(:,pos)>frente,1)-1;    
+            indice_fim = find(P(:,ixRanking)>frente,1)-1;    
         else
             indice_fim = length(P);
         end
@@ -316,7 +318,7 @@ function P = CrowdingDistance(P, nobj, nvar, nsel)
         end
 
         % guarda distâncias calculadas por individuo
-        P(indice_ini:indice_fim,pos+1)=Di';
+        P(indice_ini:indice_fim,ixRanking+1)=Di';
 
         % ordena individuos da frente conforme distância de multidão
         [~,indice_fr] = sort(Di,'descend');
