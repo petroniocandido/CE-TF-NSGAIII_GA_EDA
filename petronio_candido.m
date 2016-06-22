@@ -12,7 +12,7 @@
 
 % Entradas:
 %  naval -> número de avaliações da função objetivo
-%  optP  -> seleção do problema: 1 - DTLZ1 / Outros - DTLZ2
+%  problema  -> seleção do problema: 1 - DTLZ1 / Outros - DTLZ2
 %  nobj  -> número de objetivos (3 ou 5 objetivos)
 %  nexec -> número de execuções do algortimo para solução do problema
 
@@ -25,9 +25,61 @@
 
 % P = [ nvar , nobj , frente , penalidades ] x nbpop
 
-function [xBest, yBest, IGDbest, IGDmed, IGDworst] = petronio_candido(naval, optP, nobj, nexec)
-	ncol = nvar + nobj + 1;
-	nbpop = 100;
+function [xBest, yBest, IGDbest, IGDmed, IGDworst] = petronio_candido(naval, problema, nobj, nexec)
+	NCOL = nvar + nobj + 2;
+	
+	% CR - CONSTANTE DE CRUZAMENTO
+    DPC = 1;
+    PC = DPC;
+    
+    % CM - CONSTANTE DE MUTAÇÃO
+    DPM = 0.5;
+    PM = DPM;
+    
+    % número de individuos da população
+	if nobj == 3
+		NBPOP = 91;
+	else
+		NBPOP = 210;
+	end
+	
+	%
+	if problema == 1 
+		nvar = 5;
+	else
+		nvar = 10;
+	end
+	
+	% número de gerações
+	ngen= round(naval/NBPOP);
+
+	for Solucao=1:nexec
+		% GERAR POPULAÇÃO INICIAL
+		P = geraPopulacaoInicial(NBPOP, nvar, NCOL);
+		
+		% AVALIAR POPULAÇÃO INICIAL
+		P = avaliarPopulacao(P, NBPOP, nvar, nobj, problema);	
+		
+		% Ordena população por frentes de não-dominância 
+		% & calcula distancia de multidão entre individuos da mesma frente
+		P = FastNonDominatedSort(P,nobj,nvar,NBPOP);
+		P = CrowdingDistance(P,nobj,nvar,NBPOP);
+		
+		while geracao <= ngen 
+			geracao = geracao + 1;
+			
+			% SELEÇÃO
+			
+			% CRUZAMENTO
+			
+			% MUTAÇÃO
+			
+			
+			
+		end
+		
+    end
+    
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
