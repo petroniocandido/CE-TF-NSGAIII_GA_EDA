@@ -65,7 +65,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 	ixRanking = nvar + nobj + 1;
 	
 	% número de gerações
-	ngen= naval; %round(naval/NBPOP);
+	ngen= round(naval/NBPOP);
 
 	for Solucao=1:nexec
 		% GERAR POPULAÇÃO INICIAL
@@ -77,45 +77,57 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		% Ordena população por frentes de não-dominância 
 		% & calcula distancia de multidão entre individuos da mesma frente
 		P = FastNonDominatedSort(P,nobj,nvar,NBPOP);
-		P = CrowdingDistance(P,nobj,nvar,NBPOP);
+		P = CrowdingDistance(P,nobj,nvar,NBPOP)
 		
 		geracao = 0;
 		
 		while geracao <= ngen 
-			geracao = geracao + 1;
+			geracao = geracao + 1
 			
 			% SELEÇÃO
 			ind = 1:ceil(NBPOP*0.2);
-			ind2 = length(ind)+1:(length(ind)+ceil(NBPOP*0.2));
+			m1 = max(ind);
+			%ind2 = length(ind)+1:(length(ind)+ceil(NBPOP*0.2)); 
+			ind2 = m1+1:2*m1;
+			ind3 = 2*m1+1:NBPOP;
 
 			% EDA
 			%Q1 = prob1(P(ind,:),0.5,nvar,NBPOP);
 			%Q2 = prob1(P(ind2,:),0.5,nvar,NBPOP);
-			[m1, s1] = estimarParametro_MediaDp_PorVariavel(P(ind,:),nvar);
-			[m2, s2] = estimarParametro_MediaDp_PorVariavel(P(ind2,:),nvar);
+			[m1, s1] = estimarParametro_MuSigma(P(ind,:),nvar);
+			[m2, s2] = estimarParametro_MuSigma(P(ind2,:),nvar);
+			[m3, s3] = estimarParametro_MuSigma(P(ind3,:),nvar);
+			%[ma1, mi1] = estimarParametro_MaxMin(P(ind,:),nvar);
+			%[ma2, mi2] = estimarParametro_MaxMin(P(ind2,:),nvar);
+			Q1 = gerarPopulacao_gaussMV(m1, s1, ceil(NBPOP*0.6),nvar);
+			Q2 = gerarPopulacao_gaussMV(m2, s2, ceil(NBPOP*0.3),nvar);
+			Q3 = gerarPopulacao_gaussMV(m3, s3, NBPOP-ceil(NBPOP*0.9),nvar);
 			
-			Q1 = gerarPopulacao_unif(m1, s1,ceil(NBPOP*0.5),nvar);
-			Q2 = gerarPopulacao_lognormUV(m2, s2,ceil(NBPOP*0.5),nvar);
-			
-			Q = [Q1;Q2];
+			Q = [Q1;Q2;Q3];
 						
-			% AVALIAR POPULAÇÃO
-			Q = avaliarPopulacao(Q, NBPOP, nvar, nobj, problema);
-			
 			% S = P U Q
-			S = [P(:,1:(nvar+nobj));Q];     %S = [P;Q];
+			S = [P(:,1:nvar);Q];     %S = [P;Q];
+			
+			% AVALIAR POPULAÇÃO
+			S = avaliarPopulacao(S, NBPOP*2, nvar, nobj, problema);
 			
 			% Ordena individuos por frentes de não dominância
 			S = FastNonDominatedSort(S,nobj,nvar,NBPOP*2);
 			
 			%S(:,ixRanking);
 			
+			%size(S)
+			
 			% Calcula distância de multidão e seleciona 50% dos melhores indivíduos em St
 			P = CrowdingDistance(S,nobj,nvar,NBPOP);
 			
-			%if mod(geracao,5) == 0
-			%	P
-			%end
+			if mod(geracao,100) == 0
+				P
+			end
+			
+			%size(P)
+			
+			%P(:,ixRanking)
 			
 		end
 		
@@ -131,19 +143,15 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 				
 		% Calcula IGD das Soluções
 		if problema == 1 && nobj==3        
-		   load('dtlz1_3d.mat');
 		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
 
 		elseif problema == 1 && nobj==5        
-		   load('dtlz1_5d.mat');
 		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
 		   
 		elseif problema ~= 1 && nobj==3          
-		   load('dtlz2_3d.mat');
 		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
 		   
 		else
-		   load('dtlz2_5d.mat');
 		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);       
 		end   
 			
@@ -511,9 +519,22 @@ function [MU, SIGMA] = estimarParametro_MediaDp_PorVariavel(P,nvar)
 	SIGMA = std(P(:,1:nvar));
 end
 
+function [MU, SIGMA] = estimarParametro_MuSigma(P,nvar)
+	MU = mean(P(:,1:nvar));
+	SIGMA = cov(P(:,1:nvar));
+end
+
+% Uniforme 
+function [MIN,MAX] = estimarParametro_MaxMin(P,nvar)
+	MIN = min(P(:,1:nvar));
+	MAX = max(P(:,1:nvar));
+end
+
 function P= gerarPopulacao_gaussUV(mu, sigma,nbpop,nvar)
 	for i=1:nbpop
-		P(i,1:nvar) = max(min(normrnd(mu, sigma),1),0);
+		for k=1:nvar
+			P(i,k) = max(min(normrnd(mu(k), sigma(k)),1),0);
+		end
 	end
 end
 
@@ -523,13 +544,29 @@ function P= gerarPopulacao_lognormUV(mu, sigma,nbpop,nvar)
 	end
 end
 
-function P = gerarPopulacao_unif(mu, sigma,nbpop,nvar)
+function P = gerarPopulacao_unif(pmin, pmax, nbpop, nvar)
+	for k=1:nvar
+		prng(k) = pmax(k)-pmin(k);
+	end
+	for i=1:nbpop
+		for k=1:nvar
+			P(i,k) = prng(k)*rand()+pmin(k);
+		end
+	end
+end
+
+function P = gerarPopulacao_unifMDP(mu, sigma,nbpop,nvar)
 	pmax = min(mu + sigma,1);
 	pmin = max(mu - sigma,0);
 	for i=1:nbpop
 		P(i,1:nvar) = (pmax-pmin)*rand()+pmin;
 	end
 end
+
+function P = gerarPopulacao_gaussMV(mu,sigma,nbpop,nvar)
+	P(1:nbpop,1:nvar) = max(min(mvnrnd(mu,sigma,nbpop),1),0);
+end
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ESCOLHE 2 INDIVÍDUOS ALEATÓRIOS NA POPULAÇÃO TAL QUE d(I) < d(J)
@@ -599,3 +636,31 @@ function [m] = prob2(mx,p,nvar,nBpop)
     end
     m = m_prob;
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% NSGA-III
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function z = pontoIdeal(P,nvar)
+	for i = 1:nvar
+		z(i) = min( P(:,i) );
+	end
+end
+
+
+function Z = normalizarObjetivos(P,nbpop,nvar)
+	for i = 1:nvar
+		zmin(i) = min( P(:,i) );
+		zrng(i) = max( P(:,i) ) - zmin(i);
+	end
+	for k = 1:nbpop
+		for i = 1:nvar
+			Z(k,i) = (P(k,i) - zmin(i))/zrng(i)
+		end
+	end
+end
+
+function P = distanciaNichos(O,w)
+	
+end
+
