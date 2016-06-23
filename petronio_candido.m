@@ -26,26 +26,33 @@
 % P = [ nvar , nobj , frente , penalidades ] x nbpop
 
 function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, problema, nobj, nexec)
+	format short;
 	
-	% CR - CONSTANTE DE CRUZAMENTO
-    PC = 1;
-    
-    % CM - CONSTANTE DE MUTAÇÃO
-    PM = 0.5;
-    
-    % número de individuos da população
+	if problema == 1 && nobj==3        
+	   load('dtlz1_3d.mat');
+	elseif problema == 1 && nobj==5        
+	   load('dtlz1_5d.mat');
+	elseif problema ~= 1 && nobj==3          
+	   load('dtlz2_3d.mat');
+	else
+	   load('dtlz2_5d.mat');       
+	end   
+	
+	% número de individuos da população
 	if nobj == 3
-		NBPOP = 20; %91;
+		NBPOP = 91;
 	else
 		NBPOP = 210;
 	end
-	
+		
 	%
 	if problema == 1 
-		nvar = 5;
+		k = 5;
 	else
-		nvar = 10;
+		k = 10;
 	end
+	
+	nvar = nobj + k - 1;
 	
 	NCOL = nvar + nobj + 2;
 	
@@ -58,11 +65,11 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 	ixRanking = nvar + nobj + 1;
 	
 	% número de gerações
-	ngen= round(naval/NBPOP);
+	ngen= naval; %round(naval/NBPOP);
 
 	for Solucao=1:nexec
 		% GERAR POPULAÇÃO INICIAL
-		P = geraPopulacaoInicial(NBPOP, nvar, NCOL);
+		P = rand(NBPOP,nvar); %P = geraPopulacaoInicial(NBPOP, nvar, NCOL)
 		
 		% AVALIAR POPULAÇÃO INICIAL
 		P = avaliarPopulacao(P, NBPOP, nvar, nobj, problema);
@@ -78,27 +85,37 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			geracao = geracao + 1;
 			
 			% SELEÇÃO
-			Q = selecao_torneio(P, NBPOP, nvar, NCOL, 1);
+			ind = 1:ceil(NBPOP*0.2);
+			ind2 = length(ind)+1:(length(ind)+ceil(NBPOP*0.2));
+
+			% EDA
+			%Q1 = prob1(P(ind,:),0.5,nvar,NBPOP);
+			%Q2 = prob1(P(ind2,:),0.5,nvar,NBPOP);
+			[m1, s1] = estimarParametro_MediaDp_PorVariavel(P(ind,:),nvar);
+			[m2, s2] = estimarParametro_MediaDp_PorVariavel(P(ind2,:),nvar);
 			
-			% CRUZAMENTO
-			Q = cruzamento(Q, NBPOP, nvar, nobj, PC);
+			Q1 = gerarPopulacao_unif(m1, s1,ceil(NBPOP*0.5),nvar);
+			Q2 = gerarPopulacao_lognormUV(m2, s2,ceil(NBPOP*0.5),nvar);
 			
-			% MUTAÇÃO
-			Q = mutacao(Q, NBPOP, nvar, NCOL, PM);
-			
+			Q = [Q1;Q2];
+						
 			% AVALIAR POPULAÇÃO
 			Q = avaliarPopulacao(Q, NBPOP, nvar, nobj, problema);
 			
 			% S = P U Q
-			S = [P;Q];
+			S = [P(:,1:(nvar+nobj));Q];     %S = [P;Q];
 			
 			% Ordena individuos por frentes de não dominância
 			S = FastNonDominatedSort(S,nobj,nvar,NBPOP*2);
 			
-			%S(:,ixRanking)
+			%S(:,ixRanking);
 			
 			% Calcula distância de multidão e seleciona 50% dos melhores indivíduos em St
 			P = CrowdingDistance(S,nobj,nvar,NBPOP);
+			
+			%if mod(geracao,5) == 0
+			%	P
+			%end
 			
 		end
 		
@@ -173,11 +190,11 @@ end
 % [Pnew] = avaliarPopulacao(Pold, nbpop, nvar, nobj, tipo) 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function Pnew = avaliarPopulacao(Pold, nbpop, nvar, nobj, tipo) 
+function P = avaliarPopulacao(P, nbpop, nvar, nobj, tipo) 
 	if tipo == 1
-        Pnew = avaliarPopulacaoDTLZ1 (Pold,nbpop,nvar,nobj);
+        P = avaliarPopulacaoDTLZ1 (P,nbpop,nvar,nobj);
     else
-        Pnew = avaliarPopulacaoDTLZ2 (Pold,nbpop,nvar,nobj);
+        P = avaliarPopulacaoDTLZ2 (P,nbpop,nvar,nobj);
     end
 end
 
@@ -255,18 +272,16 @@ end
 % flag = 2 - v domina u
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-function flag = domina(u,v)
-
-    % As soluções são incomparáveis
+function flag = domina(U,V)
+    % Se as soluções são incomparáveis, retorna 0
     flag = 0;
     
-    % u domina v
-    if all(u >= v) && any(u < v)
+    % U > V
+    if all(V >= U) && any(U < V)
        flag = 1;
         
-    % v domina u
-    elseif all(u >= v) && any(v < u)
+    % V > U
+    elseif all(U >= V) && any(V < U)
        flag = 2;
     end
     
@@ -460,6 +475,7 @@ function P = CrowdingDistance(P, nobj, nvar, nsel)
     P = P(1:nsel,:);
 end
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Funcao para Cálculo da Distância Geracional Invertida (IGD)
 % pareto - Soluções da Fronteira de Pareto
@@ -488,104 +504,31 @@ function igd = IGD(pareto, solucao)
     igd = mean(dmin);
 end
  
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% OPERADOR DE CRUZAMENTO
-%
-% [PNew, nc] = cruzamento(POld, nbpop, nvar, cr)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function PNew = cruzamento(POld, nbpop, nvar, nobj, pc)
-	PNew = POld;
-    
-    [r, c] = size(POld);
-    
-    cruzamentos = r * pc;
-    
-    alpha_pol = 0.9;	% Coef. de multiplicação linear polarizado
-    
-    alpha = 0.5;		% Coef. de multiplicação linear 
-    
-    for ix = 1:cruzamentos
-    	    	
-		dir = randi([0, 1]);	% Direção do cruzamento
-		
-		kcross = randi([1, nvar]);	% Ponto de corte
-		
-		% Seleção aleatória dos indivíduos para cruzamento
-		[i,j] = escolhe2(POld,r,nvar+nobj+1);
-		
-		if dir == 0
-			tmp1 = (alpha_pol * POld(i, 1:kcross)) + ((1-alpha_pol) * POld(j, 1:kcross));
-			f1 =  [tmp1, POld(i, kcross+1:nvar)];
-			tmp2 = ((1-alpha) * POld(i, 1:kcross)) + (alpha * POld(j, 1:kcross));
-			f2 =  [tmp2, POld(j, kcross+1:nvar)];
-		else
-			tmp1 = (alpha_pol * POld(i, kcross:nvar)) + ((1-alpha_pol) * POld(j, kcross:nvar));
-			f1 =  [POld(i, 1:kcross-1), tmp1];
-			tmp2 = ((1-alpha) * POld(i, kcross:nvar)) + (alpha * POld(j, kcross:nvar));
-			f2 =  [POld(j, 1:kcross-1), tmp2];
-		end
-					
-		PNew(i,1:nvar) = f1;
-		PNew(j,1:nvar) = f2;
-		
-	end
-
+% Gaussiana Univariada 
+function [MU, SIGMA] = estimarParametro_MediaDp_PorVariavel(P,nvar)
+	MU = mean(P(:,1:nvar));
+	SIGMA = std(P(:,1:nvar));
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% OPERADOR DE MUTAÇÃO
-%
-% [PNew, nc] = mutacao(POld, nbpop, nvar, cm)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function P= gerarPopulacao_gaussUV(mu, sigma,nbpop,nvar)
+	for i=1:nbpop
+		P(i,1:nvar) = max(min(normrnd(mu, sigma),1),0);
+	end
+end
 
-function PNew = mutacao(POld, nbpop, nvar, ncol, pm)
-	%PNew = zeros(nbpop, ncol);
-    PNew = POld;
-    [R, s] = size(POld);
-    for i = 1:R
-    
-		r = rand();
-		
-		if r < pm
-		
-			if exist('vrange')
-				clear vrange;
-			end
-		
-			dir = randi([0, 1]);	% Direção da mutação
-			
-			kmut = randi(nvar - dir);	% Ponto de mutação
-			
-			if dir == 0
-				for k = 1:kmut
-					vrange(k) = max(POld(:,k)) - min(POld(:,k));
-					if vrange(k) < 0.2
-						vrange(k) = rand();
-					end
-				end
-			else
-				for k = kmut:nvar
-					vrange(k-(kmut-1)) = max(POld(:,k)) - min(POld(:,k));
-					if vrange(k-(kmut-1)) < 0.2
-						vrange(k-(kmut-1)) = rand();
-					end
-				end
-			end
-    
-			beta = -1*rand() + rand(); %2.0*rand()-1.0;
-			
-			gamma = beta*vrange;
-			
-			if dir == 0	
-				PNew(i,1:kmut) = POld(i,1:kmut) + gamma;
-				%PNew(i,kmut+1:ncol) = POld(i,kmut+1:ncol)
-			else
-				PNew(i,kmut:nvar) = POld(i,kmut:nvar) + gamma;
-				%PNew(i,1:kmut-1) = POld(i,1:kmut-1)
-			end
-		end
-    end
+function P= gerarPopulacao_lognormUV(mu, sigma,nbpop,nvar)
+	for i=1:nbpop
+		P(i,1:nvar) = max(min(normrnd(mu, sigma),1),0);
+	end
+end
+
+function P = gerarPopulacao_unif(mu, sigma,nbpop,nvar)
+	pmax = min(mu + sigma,1);
+	pmin = max(mu - sigma,0);
+	for i=1:nbpop
+		P(i,1:nvar) = (pmax-pmin)*rand()+pmin;
+	end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -624,4 +567,35 @@ function PNew = selecao_torneio(POld, nbpop, nvar, ncol, ps)
 			PNew(ix,:) = POld(j,:);
 		end
     end
+end
+
+
+% Função de Probabilidade baseada em Gausiana Normal
+function [m] = prob1(mx,p,nvar,nBpop)
+    desv = std(mx(:,1:nvar));
+    med = mean(mx(:,1:nvar));
+    liminf = max((med-desv*1),0);
+    limsup = min((med+desv*1),1);
+    for i=1:nvar
+        if i==1
+            m_prob = unifrnd(liminf(1,i),limsup(1,i),round(nBpop*p),1);
+        else
+            m_prob = [m_prob unifrnd(liminf(1,i),limsup(1,i),round(nBpop*p),1)];
+        end
+    end
+    m = m_prob;
+end
+
+% Função de Probabilidade baseada em LogNormal
+function [m] = prob2(mx,p,nvar,nBpop)
+    desv = std(mx(:,1:nvar));
+    med = mean(mx(:,1:nvar));
+    for i=1:round(nBpop*p)
+        if i==1
+            m_prob = min(lognrnd(med,desv),1)*(rand);
+        else
+            m_prob(i,:) = min(lognrnd(med,desv),1)*(rand);
+        end
+    end
+    m = m_prob;
 end
