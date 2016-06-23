@@ -1,4 +1,4 @@
-
+format long;
 clear all;
 close all;
 clc;

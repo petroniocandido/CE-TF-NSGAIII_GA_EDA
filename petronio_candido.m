@@ -35,7 +35,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
     
     % número de individuos da população
 	if nobj == 3
-		NBPOP = 91;
+		NBPOP = 20; %91;
 	else
 		NBPOP = 210;
 	end
@@ -65,7 +65,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		P = geraPopulacaoInicial(NBPOP, nvar, NCOL);
 		
 		% AVALIAR POPULAÇÃO INICIAL
-		P = avaliarPopulacao(P, NBPOP, nvar, nobj, problema);	
+		P = avaliarPopulacao(P, NBPOP, nvar, nobj, problema);
 		
 		% Ordena população por frentes de não-dominância 
 		% & calcula distancia de multidão entre individuos da mesma frente
@@ -75,7 +75,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		geracao = 0;
 		
 		while geracao <= ngen 
-			geracao = geracao + 1
+			geracao = geracao + 1;
 			
 			% SELEÇÃO
 			Q = selecao_torneio(P, NBPOP, nvar, NCOL, 1);
@@ -90,12 +90,12 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			Q = avaliarPopulacao(Q, NBPOP, nvar, nobj, problema);
 			
 			% S = P U Q
-			S = [P(:,1:(nvar+nobj));Q];
+			S = [P;Q];
 			
 			% Ordena individuos por frentes de não dominância
 			S = FastNonDominatedSort(S,nobj,nvar,NBPOP*2);
 			
-			S(:,ixRanking)
+			%S(:,ixRanking)
 			
 			% Calcula distância de multidão e seleciona 50% dos melhores indivíduos em St
 			P = CrowdingDistance(S,nobj,nvar,NBPOP);
@@ -104,9 +104,9 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		
 		% verifica o número de soluções não dominadas finais obtidas
 		if P(end,ixRanking) == 1
-			nnd = npop;
+			nnd = NBPOP;
 		else
-			nnd = find(P(:,ixRanking)>1,1)-1;   
+			nnd = find(P(:,ixRanking)>1,1)-1
 		end
 			
 		solucoes_var = P(1:nnd,ixVariaveis);  % valores das variáveis de busca para a solução final
@@ -182,14 +182,16 @@ function Pnew = avaliarPopulacao(Pold, nbpop, nvar, nobj, tipo)
 end
 
 % Funcao de Avaliação - DTLZ1
-function Pnew = avaliarPopulacaoDTLZ1 (Pold,nbpop,nvar,nobj)
+function P = avaliarPopulacaoDTLZ1 (P,nbpop,nvar,nobj)
     
     k=5;
     f = zeros(1,nobj);
     
+    ixObj = nvar+1:nvar+nobj;
+    
     for ind=1:nbpop
 
-        x = Pold(ind,:);
+        x = P(ind,:);
     
         s = 0;
 
@@ -207,20 +209,22 @@ function Pnew = avaliarPopulacaoDTLZ1 (Pold,nbpop,nvar,nobj)
 
         f(nobj) = 0.5 * (1-x(1)) * (1+g);
         
-        Pnew(ind,nvar+1:nvar+nobj) = f;
+        P(ind,ixObj) = f;
         
     end
 end
 
 % Funcao de Avaliação - DTLZ2
-function Pnew = avaliarPopulacaoDTLZ2 (Pold,nbpop,nvar,nobj)
+function P = avaliarPopulacaoDTLZ2 (P,nbpop,nvar,nobj)
     
     k=10;
     f = zeros(1,nobj);
+    
+    ixObj = nvar+1:nvar+nobj;
 
     for ind=1:nbpop
         
-        x = Pold(ind,:);
+        x = P(ind,:);
 
         s = 0;
         
@@ -240,7 +244,7 @@ function Pnew = avaliarPopulacaoDTLZ2 (Pold,nbpop,nvar,nobj)
         end
         
         f(nobj) = (1+g) * sinx(1);
-        Pnew(ind,nvar+1:nvar+nobj) = f;
+        P(ind,ixObj) = f;
     end
 end
 
@@ -286,8 +290,8 @@ function P = FastNonDominatedSort(P, nobj, nvar, nbpop)
     individuo = [];
 
 	% índices na matriz de população P
-    ixRanking = nobj + nvar + 1;     %frente de dominância
     ixObj = nvar + 1 : nvar + nobj;		%final da faixa de objetivos
+    ixRanking = nobj + nvar + 1;     %frente de dominância
 
     % 1) Compara a dominância entre todos os individuos da população, 
     %    dois a dois, e identifica a frente de não dominância.
@@ -349,8 +353,7 @@ function P = FastNonDominatedSort(P, nobj, nvar, nbpop)
 
                    % verifica que nenhum dos individuos nas fronteiras subsequentes dominam "q"
                    if individuo(individuo(F(frente).f(i)).p(j)).n == 0
-
-                        P(individuo(F(frente).f(i)).p(j),ixRanking) = frente + 1;   % guarda rank do indivíduo
+						P(individuo(F(frente).f(i)).p(j),ixRanking) = frente + 1;   % guarda rank do indivíduo
                         Qf = [Qf individuo(F(frente).f(i)).p(j)];                % salva indivíduo da frente não dominada atual
                    end                
                end
@@ -610,10 +613,10 @@ end
 function PNew = selecao_torneio(POld, nbpop, nvar, ncol, ps)
     num_selecionados = nbpop * ps;
     
-    k = 0.65;
+    k = 0.7;
     
     for ix = 1:num_selecionados
-		[i,j] = escolhe2(POld,nbpop,nvar);
+		[i,j] = escolhe2(POld,nbpop,ncol-1);
 		r = rand();
 		if r < k
 			PNew(ix,:) = POld(i,:);
