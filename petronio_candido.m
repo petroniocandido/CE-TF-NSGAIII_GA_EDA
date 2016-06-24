@@ -77,7 +77,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		% Ordena população por frentes de não-dominância 
 		% & calcula distancia de multidão entre individuos da mesma frente
 		P = FastNonDominatedSort(P,nobj,nvar,NBPOP);
-		P = CrowdingDistance(P,nobj,nvar,NBPOP)
+		P = CrowdingDistance(P,nobj,nvar,NBPOP);
 		
 		geracao = 0;
 		
@@ -103,7 +103,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			%size(S)
 			
 			% Calcula distância de multidão e seleciona 50% dos melhores indivíduos em St
-			P = CrowdingDistance(S,nobj,nvar,NBPOP)
+			P = CrowdingDistance(S,nobj,nvar,NBPOP);
 			
 			if mod(geracao,100) == 0
 				P
@@ -622,14 +622,20 @@ function Q = GA(P,nbpop,nvar,nobj)
 	
 	ixRanking = nvar + nobj + 1;
 	
-	Q1 = P(P(:,ixRanking) == 1, : );
-	P2 = P(P(:,ixRanking) > 1, : );
-	[l2 ~] = size(P2);
+	if P(end,ixRanking) == 1
+		Q = GA_selecao_torneio(P, nbpop, ixRanking, ps);
+	else
+		% ELITISMO
+		Q1 = P(P(:,ixRanking) == 1, : );
+		P2 = P(P(:,ixRanking) > 1, : );
+		[l2 ~] = size(P2);
 
-	% SELEÇÃO
-	Q2 = GA_selecao_torneio(P2, l2, ixRanking, ps);
+		% SELEÇÃO
+		Q2 = GA_selecao_torneio(P2, l2, ixRanking, ps);
+		
+		Q = [Q1 ; Q2];
+	end
 	
-	Q = [Q1 ; Q2];
 	
 	% CRUZAMENTO
 	Q = GA_cruzamento(Q, nbpop, nvar, ixRanking, pc);

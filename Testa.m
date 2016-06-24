@@ -50,9 +50,9 @@ for optP = [1]
             grid on;
             view(60,30);
             if (optP == 1)
-                axis(0.5 * [0 1 0 1 0 1]);
+                axis(0.5 * [0 3 0 3 0 3]);
             else
-                axis([0 1 0 1 0 1]);
+                axis([0 3 0 3 0 3]);
             end
             drawnow();
             legend('Fronteira Pareto', 'Soluções Não Dominadas')
