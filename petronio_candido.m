@@ -84,26 +84,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		while geracao <= ngen 
 			geracao = geracao + 1
 			
-			% SELEÇÃO
-			ind = 1:ceil(NBPOP*0.2);
-			m1 = max(ind);
-			%ind2 = length(ind)+1:(length(ind)+ceil(NBPOP*0.2)); 
-			ind2 = m1+1:2*m1;
-			ind3 = 2*m1+1:NBPOP;
-
-			% EDA
-			%Q1 = prob1(P(ind,:),0.5,nvar,NBPOP);
-			%Q2 = prob1(P(ind2,:),0.5,nvar,NBPOP);
-			[m1, s1] = estimarParametro_MuSigma(P(ind,:),nvar);
-			[m2, s2] = estimarParametro_MuSigma(P(ind2,:),nvar);
-			[m3, s3] = estimarParametro_MuSigma(P(ind3,:),nvar);
-			%[ma1, mi1] = estimarParametro_MaxMin(P(ind,:),nvar);
-			%[ma2, mi2] = estimarParametro_MaxMin(P(ind2,:),nvar);
-			Q1 = gerarPopulacao_gaussMV(m1, s1, ceil(NBPOP*0.6),nvar);
-			Q2 = gerarPopulacao_gaussMV(m2, s2, ceil(NBPOP*0.3),nvar);
-			Q3 = gerarPopulacao_gaussMV(m3, s3, NBPOP-ceil(NBPOP*0.9),nvar);
-			
-			Q = [Q1;Q2;Q3];
+			Q = EDA(P, NBPOP, nvar);
 						
 			% S = P U Q
 			S = [P(:,1:nvar);Q];     %S = [P;Q];
@@ -511,26 +492,54 @@ function igd = IGD(pareto, solucao)
     % realiza a média das menores distâncias
     igd = mean(dmin);
 end
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% EDA - Estimative Distribution Algorithm
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function Q = EDA(P,nbpop,nvar)
+	% SELEÇÃO
+	ind = 1:ceil(nbpop*0.2);
+	m1 = max(ind);
+	%ind2 = length(ind)+1:(length(ind)+ceil(NBPOP*0.2)); 
+	ind2 = m1+1:2*m1;
+	ind3 = 2*m1+1:nbpop;
+
+	% EDA
+	%Q1 = prob1(P(ind,:),0.5,nvar,NBPOP);
+	%Q2 = prob1(P(ind2,:),0.5,nvar,NBPOP);
+	[m1, s1] = EDA_estimarParametro_MuSigma(P(ind,:),nvar);
+	[m2, s2] = EDA_estimarParametro_MuSigma(P(ind2,:),nvar);
+	[m3, s3] = EDA_estimarParametro_MuSigma(P(ind3,:),nvar);
+	%[ma1, mi1] = estimarParametro_MaxMin(P(ind,:),nvar);
+	%[ma2, mi2] = estimarParametro_MaxMin(P(ind2,:),nvar);
+	Q1 = EDA_gerarPopulacao_gaussMV(m1, s1, ceil(NBPOP*0.6),nvar);
+	Q2 = EDA_gerarPopulacao_gaussMV(m2, s2, ceil(NBPOP*0.3),nvar);
+	Q3 = EDA_gerarPopulacao_gaussMV(m3, s3, NBPOP-ceil(NBPOP*0.9),nvar);
+	
+	Q = [Q1;Q2;Q3];
+end
  
 
 % Gaussiana Univariada 
-function [MU, SIGMA] = estimarParametro_MediaDp_PorVariavel(P,nvar)
+function [MU, SIGMA] = EDA_estimarParametro_MediaDp_PorVariavel(P,nvar)
 	MU = mean(P(:,1:nvar));
 	SIGMA = std(P(:,1:nvar));
 end
 
-function [MU, SIGMA] = estimarParametro_MuSigma(P,nvar)
+function [MU, SIGMA] = EDA_estimarParametro_MuSigma(P,nvar)
 	MU = mean(P(:,1:nvar));
 	SIGMA = cov(P(:,1:nvar));
 end
 
 % Uniforme 
-function [MIN,MAX] = estimarParametro_MaxMin(P,nvar)
+function [MIN,MAX] = EDA_estimarParametro_MaxMin(P,nvar)
 	MIN = min(P(:,1:nvar));
 	MAX = max(P(:,1:nvar));
 end
 
-function P= gerarPopulacao_gaussUV(mu, sigma,nbpop,nvar)
+function P= EDA_gerarPopulacao_gaussUV(mu, sigma,nbpop,nvar)
 	for i=1:nbpop
 		for k=1:nvar
 			P(i,k) = max(min(normrnd(mu(k), sigma(k)),1),0);
@@ -538,13 +547,13 @@ function P= gerarPopulacao_gaussUV(mu, sigma,nbpop,nvar)
 	end
 end
 
-function P= gerarPopulacao_lognormUV(mu, sigma,nbpop,nvar)
+function P= EDA_gerarPopulacao_lognormUV(mu, sigma,nbpop,nvar)
 	for i=1:nbpop
 		P(i,1:nvar) = max(min(normrnd(mu, sigma),1),0);
 	end
 end
 
-function P = gerarPopulacao_unif(pmin, pmax, nbpop, nvar)
+function P = EDA_gerarPopulacao_unif(pmin, pmax, nbpop, nvar)
 	for k=1:nvar
 		prng(k) = pmax(k)-pmin(k);
 	end
@@ -555,7 +564,7 @@ function P = gerarPopulacao_unif(pmin, pmax, nbpop, nvar)
 	end
 end
 
-function P = gerarPopulacao_unifMDP(mu, sigma,nbpop,nvar)
+function P = EDA_gerarPopulacao_unifMDP(mu, sigma,nbpop,nvar)
 	pmax = min(mu + sigma,1);
 	pmin = max(mu - sigma,0);
 	for i=1:nbpop
@@ -563,52 +572,12 @@ function P = gerarPopulacao_unifMDP(mu, sigma,nbpop,nvar)
 	end
 end
 
-function P = gerarPopulacao_gaussMV(mu,sigma,nbpop,nvar)
+function P = EDA_gerarPopulacao_gaussMV(mu,sigma,nbpop,nvar)
 	P(1:nbpop,1:nvar) = max(min(mvnrnd(mu,sigma,nbpop),1),0);
 end
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ESCOLHE 2 INDIVÍDUOS ALEATÓRIOS NA POPULAÇÃO TAL QUE d(I) < d(J)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function [I, J] = escolhe2(P,nbpop,ixRanking)
-	a = randi(nbpop);	
-	b = randi(nbpop);
-			
-	if P(a,ixRanking) < P(b,ixRanking)
-		I = a;
-		J = b;
-	else
-		I = b;
-		J = a;
-	end
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ESCOLHE 2 INDIVÍDUOS ALEATÓRIOS NA POPULAÇÃO TAL QUE d(I) < d(J)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-function PNew = selecao_torneio(POld, nbpop, nvar, ncol, ps)
-    num_selecionados = nbpop * ps;
-    
-    k = 0.7;
-    
-    for ix = 1:num_selecionados
-		[i,j] = escolhe2(POld,nbpop,ncol-1);
-		r = rand();
-		if r < k
-			PNew(ix,:) = POld(i,:);
-		else
-			PNew(ix,:) = POld(j,:);
-		end
-    end
-end
-
-
 % Função de Probabilidade baseada em Gausiana Normal
-function [m] = prob1(mx,p,nvar,nBpop)
+function [m] = EDA_prob1(mx,p,nvar,nBpop)
     desv = std(mx(:,1:nvar));
     med = mean(mx(:,1:nvar));
     liminf = max((med-desv*1),0);
@@ -624,7 +593,7 @@ function [m] = prob1(mx,p,nvar,nBpop)
 end
 
 % Função de Probabilidade baseada em LogNormal
-function [m] = prob2(mx,p,nvar,nBpop)
+function [m] = EDA_prob2(mx,p,nvar,nBpop)
     desv = std(mx(:,1:nvar));
     med = mean(mx(:,1:nvar));
     for i=1:round(nBpop*p)
@@ -636,6 +605,155 @@ function [m] = prob2(mx,p,nvar,nBpop)
     end
     m = m_prob;
 end
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% GA - Genetic Algorithm with real codification
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function Q = GA(P,nbpop,nvar,nobj)
+	% SELEÇÃO
+	Q = GA_selecao_torneio(P, nbpop, nvar);
+	
+	% CRUZAMENTO
+	Q = GA_cruzamento(Q, NBPOP, nvar, NCOL, PC, NICHOS);
+	
+	% MUTAÇÃO	
+	Q = GA_mutacao(Q, NBPOP, nvar, NCOL, PM);
+end
+
+
+function [I, J] = GA_escolhe2(P,nbpop,ixRanking)
+	a = randi(nbpop);	
+	b = randi(nbpop);
+			
+	if P(a,ixRanking) < P(b,ixRanking)
+		I = a;
+		J = b;
+	else
+		I = b;
+		J = a;
+	end
+end
+
+function PNew = GA_selecao_torneio(POld, nbpop, nvar, ncol, ps)
+    num_selecionados = nbpop * ps;
+    
+    k = 0.7;
+    
+    for ix = 1:num_selecionados
+		[i,j] = escolhe2(POld,nbpop,ncol-1);
+		r = rand();
+		if r < k
+			PNew(ix,:) = POld(i,:);
+		else
+			PNew(ix,:) = POld(j,:);
+		end
+    end
+end
+
+function PNew = GA_cruzamento(POld, nbpop, nvar, ncol, pc, nichos)
+	PNew = POld;
+    
+    [r, c] = size(POld);
+    
+    cruzamentos = r * pc;
+    
+    alpha_pol = 0.9;	% Coef. de multiplicação linear polarizado
+    
+    alpha = 0.5;		% Coef. de multiplicação linear 
+    
+    for ix = 1:cruzamentos
+    	    	
+		dir = randi([0, 1]);	% Direção do cruzamento
+		
+		kcross = randi([1, nvar]);	% Ponto de corte
+		
+		if nichos > 0
+			%ni = randi(nichos)-1;
+			[i,j] = escolhe2_nichos(POld, nbpop, nvar, ncol, mod(ix,nichos));
+		else
+			% Seleção aleatória dos indivíduos para cruzamento
+			[i,j] = escolhe2(POld,r,nvar);
+		end
+	
+		
+		if dir == 0
+			tmp1 = (alpha_pol * POld(i, 1:kcross)) + ((1-alpha_pol) * POld(j, 1:kcross));
+			f1 =  [tmp1, POld(i, kcross+1:nvar)];
+			tmp2 = ((1-alpha) * POld(i, 1:kcross)) + (alpha * POld(j, 1:kcross));
+			f2 =  [tmp2, POld(j, kcross+1:nvar)];
+		else
+			tmp1 = (alpha_pol * POld(i, kcross:nvar)) + ((1-alpha_pol) * POld(j, kcross:nvar));
+			f1 =  [POld(i, 1:kcross-1), tmp1];
+			tmp2 = ((1-alpha) * POld(i, kcross:nvar)) + (alpha * POld(j, kcross:nvar));
+			f2 =  [POld(j, 1:kcross-1), tmp2];
+		end
+					
+		PNew(i,1:nvar) = f1;
+		PNew(j,1:nvar) = f2;
+		
+		if nichos > 0
+			PNew(i,ncol-1) = POld(i,ncol-1);
+			PNew(j,ncol-1) = POld(j,ncol-1);
+		end
+		
+	end
+
+end
+
+function PNew = GA_mutacao(POld, nbpop, nvar, ncol, pm)
+	%PNew = zeros(nbpop, ncol);
+    PNew = POld;
+    [R, s] = size(POld);
+    for i = 1:R
+    
+		r = rand();
+		
+		if r < pm
+		
+			if exist('vrange')
+				clear vrange;
+			end
+		
+			dir = randi([0, 1]);	% Direção da mutação
+			
+			kmut = randi(nvar - dir);	% Ponto de mutação
+			
+			if dir == 0
+				for k = 1:kmut
+					vrange(k) = max(POld(:,k)) - min(POld(:,k));
+					if vrange(k) < 0.2
+						vrange(k) = rand();
+					end
+				end
+			else
+				for k = kmut:nvar
+					vrange(k-(kmut-1)) = max(POld(:,k)) - min(POld(:,k));
+					if vrange(k-(kmut-1)) < 0.2
+						vrange(k-(kmut-1)) = rand();
+					end
+				end
+			end
+    
+			beta = -1*rand() + rand(); %2.0*rand()-1.0;
+			
+			gamma = beta*vrange;
+			
+			if dir == 0	
+				PNew(i,1:kmut) = POld(i,1:kmut) + gamma;
+				%PNew(i,kmut+1:ncol) = POld(i,kmut+1:ncol)
+			else
+				PNew(i,kmut:nvar) = POld(i,kmut:nvar) + gamma;
+				%PNew(i,1:kmut-1) = POld(i,1:kmut-1)
+			end
+		end
+    end
+    for i = R+1:nbpop
+		PNew(i,:) = geraIndividuoAleatorio(nvar, ncol);
+    end
+end
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % NSGA-III
