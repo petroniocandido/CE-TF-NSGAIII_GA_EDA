@@ -84,10 +84,13 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		while geracao <= ngen 
 			geracao = geracao + 1
 			
-			Q = EDA(P, NBPOP, nvar);
+			%Q = EDA(P, NBPOP, nvar);
+			
+			Q = GA(P, NBPOP, nvar, nobj);
 						
 			% S = P U Q
-			S = [P(:,1:nvar);Q];     %S = [P;Q];
+			%S = [P(:,1:nvar);Q];     %
+			S = [P;Q];
 			
 			% AVALIAR POPULAÇÃO
 			S = avaliarPopulacao(S, NBPOP*2, nvar, nobj, problema);
@@ -100,7 +103,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			%size(S)
 			
 			% Calcula distância de multidão e seleciona 50% dos melhores indivíduos em St
-			P = CrowdingDistance(S,nobj,nvar,NBPOP);
+			P = CrowdingDistance(S,nobj,nvar,NBPOP)
 			
 			if mod(geracao,100) == 0
 				P
@@ -514,9 +517,9 @@ function Q = EDA(P,nbpop,nvar)
 	[m3, s3] = EDA_estimarParametro_MuSigma(P(ind3,:),nvar);
 	%[ma1, mi1] = estimarParametro_MaxMin(P(ind,:),nvar);
 	%[ma2, mi2] = estimarParametro_MaxMin(P(ind2,:),nvar);
-	Q1 = EDA_gerarPopulacao_gaussMV(m1, s1, ceil(NBPOP*0.6),nvar);
-	Q2 = EDA_gerarPopulacao_gaussMV(m2, s2, ceil(NBPOP*0.3),nvar);
-	Q3 = EDA_gerarPopulacao_gaussMV(m3, s3, NBPOP-ceil(NBPOP*0.9),nvar);
+	Q1 = EDA_gerarPopulacao_gaussMV(m1, s1, ceil(nbpop*0.6),nvar);
+	Q2 = EDA_gerarPopulacao_gaussMV(m2, s2, ceil(nbpop*0.3),nvar);
+	Q3 = EDA_gerarPopulacao_gaussMV(m3, s3, nbpop-ceil(nbpop*0.9),nvar);
 	
 	Q = [Q1;Q2;Q3];
 end
@@ -612,20 +615,44 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function Q = GA(P,nbpop,nvar,nobj)
+
+	ps = 1;
+	pc = 0.9;
+	pm = 0.5;
+	
+	ixRanking = nvar + nobj + 1;
+	
+	Q1 = P(P(:,ixRanking) == 1, : );
+	P2 = P(P(:,ixRanking) > 1, : );
+	[l2 ~] = size(P2);
+
 	% SELEÇÃO
-	Q = GA_selecao_torneio(P, nbpop, nvar);
+	Q2 = GA_selecao_torneio(P2, l2, ixRanking, ps);
+	
+	Q = [Q1 ; Q2];
 	
 	% CRUZAMENTO
-	Q = GA_cruzamento(Q, NBPOP, nvar, NCOL, PC, NICHOS);
+	Q = GA_cruzamento(Q, nbpop, nvar, ixRanking, pc);
+	
+	Q = max(min(Q,1),0);
 	
 	% MUTAÇÃO	
-	Q = GA_mutacao(Q, NBPOP, nvar, NCOL, PM);
+	Q = GA_mutacao(Q, nbpop, nvar, pm);
+	
+	Q = max(min(Q,1),0);
+	
+	
 end
 
 
 function [I, J] = GA_escolhe2(P,nbpop,ixRanking)
 	a = randi(nbpop);	
 	b = randi(nbpop);
+	
+	while P(a,ixRanking) == 0 || P(b,ixRanking) == 0
+		a = randi(nbpop);	
+		b = randi(nbpop);
+	end
 			
 	if P(a,ixRanking) < P(b,ixRanking)
 		I = a;
@@ -636,13 +663,13 @@ function [I, J] = GA_escolhe2(P,nbpop,ixRanking)
 	end
 end
 
-function PNew = GA_selecao_torneio(POld, nbpop, nvar, ncol, ps)
+function PNew = GA_selecao_torneio(POld, nbpop, ixRanking, ps)
     num_selecionados = nbpop * ps;
     
-    k = 0.7;
+    k = 0.9;
     
     for ix = 1:num_selecionados
-		[i,j] = escolhe2(POld,nbpop,ncol-1);
+		[i,j] = GA_escolhe2(POld,nbpop,ixRanking);
 		r = rand();
 		if r < k
 			PNew(ix,:) = POld(i,:);
@@ -652,7 +679,7 @@ function PNew = GA_selecao_torneio(POld, nbpop, nvar, ncol, ps)
     end
 end
 
-function PNew = GA_cruzamento(POld, nbpop, nvar, ncol, pc, nichos)
+function PNew = GA_cruzamento(POld, nbpop, nvar, ixRanking, pc)
 	PNew = POld;
     
     [r, c] = size(POld);
@@ -669,14 +696,7 @@ function PNew = GA_cruzamento(POld, nbpop, nvar, ncol, pc, nichos)
 		
 		kcross = randi([1, nvar]);	% Ponto de corte
 		
-		if nichos > 0
-			%ni = randi(nichos)-1;
-			[i,j] = escolhe2_nichos(POld, nbpop, nvar, ncol, mod(ix,nichos));
-		else
-			% Seleção aleatória dos indivíduos para cruzamento
-			[i,j] = escolhe2(POld,r,nvar);
-		end
-	
+		[i,j] = GA_escolhe2(POld,nbpop,ixRanking);
 		
 		if dir == 0
 			tmp1 = (alpha_pol * POld(i, 1:kcross)) + ((1-alpha_pol) * POld(j, 1:kcross));
@@ -693,16 +713,11 @@ function PNew = GA_cruzamento(POld, nbpop, nvar, ncol, pc, nichos)
 		PNew(i,1:nvar) = f1;
 		PNew(j,1:nvar) = f2;
 		
-		if nichos > 0
-			PNew(i,ncol-1) = POld(i,ncol-1);
-			PNew(j,ncol-1) = POld(j,ncol-1);
-		end
-		
 	end
 
 end
 
-function PNew = GA_mutacao(POld, nbpop, nvar, ncol, pm)
+function PNew = GA_mutacao(POld, nbpop, nvar, pm)
 	%PNew = zeros(nbpop, ncol);
     PNew = POld;
     [R, s] = size(POld);
@@ -736,21 +751,19 @@ function PNew = GA_mutacao(POld, nbpop, nvar, ncol, pm)
 				end
 			end
     
-			beta = -1*rand() + rand(); %2.0*rand()-1.0;
+			beta = -1*rand()+rand();
 			
-			gamma = beta*vrange;
+			gamma = 0.5*beta*vrange;
 			
 			if dir == 0	
 				PNew(i,1:kmut) = POld(i,1:kmut) + gamma;
-				%PNew(i,kmut+1:ncol) = POld(i,kmut+1:ncol)
 			else
 				PNew(i,kmut:nvar) = POld(i,kmut:nvar) + gamma;
-				%PNew(i,1:kmut-1) = POld(i,1:kmut-1)
 			end
 		end
     end
     for i = R+1:nbpop
-		PNew(i,:) = geraIndividuoAleatorio(nvar, ncol);
+		PNew(i,1:nvar) = rand(1,nvar);
     end
 end
 
