@@ -69,15 +69,14 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 
 	for Solucao=1:nexec
 		% GERAR POPULAÇÃO INICIAL
-		P = rand(NBPOP,nvar); %P = geraPopulacaoInicial(NBPOP, nvar, NCOL)
+		P = rand(NBPOP*2,nvar); 
 		
 		% AVALIAR POPULAÇÃO INICIAL
-		P = avaliarPopulacao(P, NBPOP, nvar, nobj, problema);
+		P = avaliarPopulacao(P, NBPOP*2, nvar, nobj, problema);
 		
-		% Ordena população por frentes de não-dominância 
-		% & calcula distancia de multidão entre individuos da mesma frente
-		P = FastNonDominatedSort(P,nobj,nvar,NBPOP);
-		P = CrowdingDistance(P,nobj,nvar,NBPOP);
+		p = [P ; P];
+		
+		P = NSGA2(P, NBPOP, nvar, nobj);
 		
 		geracao = 0;
 		
@@ -86,9 +85,9 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			
 			%Q = EDA(P, NBPOP, nvar);
 			
-			%Q = GA(P, NBPOP, nvar, nobj);
+			Q = GA(P, NBPOP, nvar, nobj);
 			
-			Q = MIX(P, NBPOP, nvar, nobj);
+			%Q = MIX(P, NBPOP, nvar, nobj);
 						
 			% S = P U Q
 			%S = [P(:,1:nvar);Q];     %
@@ -97,15 +96,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			% AVALIAR POPULAÇÃO
 			S = avaliarPopulacao(S, NBPOP*2, nvar, nobj, problema);
 			
-			% Ordena individuos por frentes de não dominância
-			S = FastNonDominatedSort(S,nobj,nvar,NBPOP*2);
-			
-			%S(:,ixRanking);
-			
-			%size(S)
-			
-			% Calcula distância de multidão e seleciona 50% dos melhores indivíduos em St
-			P = CrowdingDistance(S,nobj,nvar,NBPOP);
+			P = NSGA2(S, NBPOP, nvar, nobj);
 			
 			if mod(geracao,100) == 0
 				P
@@ -282,11 +273,24 @@ function flag = domina(U,V)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% NSGA - II
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function P = NSGA2(P, nbpop, nvar, nobj)
+	% Ordena população por frentes de não-dominância 
+	P = NSGA2_FastNonDominatedSort(P,nobj,nvar,nbpop*2);
+	
+	% Calcula distancia de multidão entre individuos da mesma frente
+	P = NSGA2_CrowdingDistance(P,nobj,nvar,nbpop);
+end
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % FAST NON DOMINATED SORTING
 % Ordena a População Baseado em Não Dominância
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function P = FastNonDominatedSort(P, nobj, nvar, nbpop)
+function P = NSGA2_FastNonDominatedSort(P, nobj, nvar, nbpop)
 
     % Indivíduos não dominados recebem rank = 1;
     % Indivíduos da segunda fronteira recebem rank = 2;
@@ -383,7 +387,7 @@ end
 % Função para Cálculo da Distância de Multidão: distância para as soluções vizinhas em cada dimensão do espaço de busca
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function P = CrowdingDistance(P, nobj, nvar, nsel)
+function P = NSGA2_CrowdingDistance(P, nobj, nvar, nsel)
 
     % posição com informação do rank (número da frente de dominância)
     ixRanking = nvar + nobj + 1;    
@@ -526,13 +530,21 @@ function Q = EDA(P,nbpop,nvar)
 	%Q3 = EDA_gerarPopulacao_gaussUVGlobal(m3, s3, nbpop - pq1 - pq2,nvar);
 	
 	%Q = [Q1;Q2;Q3];
+	%pq1 = ceil(nbpop*0.5);
 	
-	[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P,nvar)
+	%[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P,nvar)
+	%Q = EDA_gerarPopulacao_gaussUV(m1, s1, nbpop, nvar);
+	
+	[m1, s1] = EDA_estimarParametro_MediaDp_Global(P,nvar)
 	Q = EDA_gerarPopulacao_gaussUVGlobal(m1, s1, nbpop, nvar);
 	
 	Q = max(min(Q,1),0);
 end
  
+function [MU, SIGMA] = EDA_estimarParametro_MediaDp_Global(P,nvar)
+	MU = mean(mean(P(:,1:nvar)));
+	SIGMA = max(std(P(:,1:nvar)));
+end
 
 % Gaussiana Univariada 
 function [MU, SIGMA] = EDA_estimarParametro_MediaDp_PorVariavel(P,nvar)
@@ -554,7 +566,7 @@ end
 function P= EDA_gerarPopulacao_gaussUV(mu, sigma,nbpop,nvar)
 	for i=1:nbpop
 		for k=1:nvar
-			P(i,k) = max(min(normrnd(mu(k), sigma(k)),1),0);
+			P(i,k) = normrnd(mu(k), sigma(k));
 		end
 	end
 end
@@ -591,7 +603,7 @@ end
 function P = EDA_gerarPopulacao_gaussUVGlobal(mu, sigma,nbpop,nvar)
 	for i=1:nbpop
 		for k = 1:nvar
-			P(i,k) = normrnd(mu(k), sigma(k));
+			P(i,k) = normrnd(mu, sigma);
 		end
 	end
 end
