@@ -23,7 +23,7 @@
 %  igd_mean	= média dos valores de IGD obtidos para as 'nexec' execuções
 %  igd_min	= pior valor de IGD obtido
 
-% P = [ nvar , nobj , frente , penalidades ] x nbpop
+% P = [ nvar , nobj , frente , distânncia de multidão ] x nbpop
 
 function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, problema, nobj, nexec)
 	format short;
@@ -86,11 +86,13 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			
 			%Q = EDA(P, NBPOP, nvar);
 			
-			Q = GA(P, NBPOP, nvar, nobj);
+			%Q = GA(P, NBPOP, nvar, nobj);
+			
+			Q = MIX(P, NBPOP, nvar, nobj);
 						
 			% S = P U Q
 			%S = [P(:,1:nvar);Q];     %
-			S = [P;Q];
+			S = [P(:,1:nvar);Q(:,1:nvar)];
 			
 			% AVALIAR POPULAÇÃO
 			S = avaliarPopulacao(S, NBPOP*2, nvar, nobj, problema);
@@ -503,25 +505,32 @@ end
 
 function Q = EDA(P,nbpop,nvar)
 	% SELEÇÃO
-	ind = 1:ceil(nbpop*0.2);
-	m1 = max(ind);
+	%ind = 1:ceil(nbpop*0.2);
+	%m1 = max(ind);
 	%ind2 = length(ind)+1:(length(ind)+ceil(NBPOP*0.2)); 
-	ind2 = m1+1:2*m1;
-	ind3 = 2*m1+1:nbpop;
+	%ind2 = m1+1:2*m1;
+	%ind3 = 2*m1+1:nbpop;
 
 	% EDA
 	%Q1 = prob1(P(ind,:),0.5,nvar,NBPOP);
 	%Q2 = prob1(P(ind2,:),0.5,nvar,NBPOP);
-	[m1, s1] = EDA_estimarParametro_MuSigma(P(ind,:),nvar);
-	[m2, s2] = EDA_estimarParametro_MuSigma(P(ind2,:),nvar);
-	[m3, s3] = EDA_estimarParametro_MuSigma(P(ind3,:),nvar);
+	%[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind,:),nvar)
+	%[m2, s2] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind2,:),nvar)
+	%[m3, s3] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind3,:),nvar)
 	%[ma1, mi1] = estimarParametro_MaxMin(P(ind,:),nvar);
 	%[ma2, mi2] = estimarParametro_MaxMin(P(ind2,:),nvar);
-	Q1 = EDA_gerarPopulacao_gaussMV(m1, s1, ceil(nbpop*0.6),nvar);
-	Q2 = EDA_gerarPopulacao_gaussMV(m2, s2, ceil(nbpop*0.3),nvar);
-	Q3 = EDA_gerarPopulacao_gaussMV(m3, s3, nbpop-ceil(nbpop*0.9),nvar);
+	%pq1 = ceil(nbpop*0.6);
+	%pq2 = ceil(nbpop*0.3);
+	%Q1 = EDA_gerarPopulacao_gaussUVGlobal(m1, s1, pq1,nvar);
+	%Q2 = EDA_gerarPopulacao_gaussUVGlobal(m2, s2, pq2,nvar);
+	%Q3 = EDA_gerarPopulacao_gaussUVGlobal(m3, s3, nbpop - pq1 - pq2,nvar);
 	
-	Q = [Q1;Q2;Q3];
+	%Q = [Q1;Q2;Q3];
+	
+	[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P,nvar)
+	Q = EDA_gerarPopulacao_gaussUVGlobal(m1, s1, nbpop, nvar);
+	
+	Q = max(min(Q,1),0);
 end
  
 
@@ -577,6 +586,14 @@ end
 
 function P = EDA_gerarPopulacao_gaussMV(mu,sigma,nbpop,nvar)
 	P(1:nbpop,1:nvar) = max(min(mvnrnd(mu,sigma,nbpop),1),0);
+end
+
+function P = EDA_gerarPopulacao_gaussUVGlobal(mu, sigma,nbpop,nvar)
+	for i=1:nbpop
+		for k = 1:nvar
+			P(i,k) = normrnd(mu(k), sigma(k));
+		end
+	end
 end
 
 % Função de Probabilidade baseada em Gausiana Normal
@@ -773,6 +790,18 @@ function PNew = GA_mutacao(POld, nbpop, nvar, pm)
     end
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% GA - Genetic Algorithm with real codification
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function Q = MIX(P,nbpop,nvar,nobj)
+	ixRanking = nvar + nobj + 1;
+	if P(end,ixRanking) == 1
+		Q = EDA(P,nbpop,nvar);
+	else
+		Q = GA(P,nbpop,nvar,nobj);
+	end
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % NSGA-III
