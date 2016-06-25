@@ -82,7 +82,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		geracao = 0;
 		
 		while geracao <= ngen 
-			geracao = geracao + 1
+			geracao = geracao + 1;
 			
 			%Q = EDA(P, NBPOP, nvar);
 			

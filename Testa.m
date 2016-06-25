@@ -3,7 +3,7 @@ clear all;
 close all;
 clc;
 
-nexec = 1;
+nexec = 3;
 
 % Definir problema [optP] e numero de objetivos [nobj]
 % optP: 1 - DTLZ1 / Outros - DTLZ2
@@ -50,9 +50,9 @@ for optP = [1]
             grid on;
             view(60,30);
             if (optP == 1)
-                axis(0.5 * [0 3 0 3 0 3]);
+                axis(0.5 * [0 1 0 1 0 1]);
             else
-                axis([0 3 0 3 0 3]);
+                axis([0 1 0 1 0 1]);
             end
             drawnow();
             legend('Fronteira Pareto', 'Soluções Não Dominadas')
