@@ -74,7 +74,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		% AVALIAR POPULAÇÃO INICIAL
 		P = avaliarPopulacao(P, NBPOP*2, nvar, nobj, problema);
 		
-		p = [P ; P];
+		P = [P ; P];
 		
 		P = NSGA2(P, NBPOP, nvar, nobj);
 		
@@ -84,13 +84,9 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			geracao = geracao + 1;
 			
 			%Q = EDA(P, NBPOP, nvar);
-			
-			Q = GA(P, NBPOP, nvar, nobj);
-			
-			%Q = MIX(P, NBPOP, nvar, nobj);
+			Q = GA(P, NBPOP, nvar, nobj)
+			%Q = HIBRIDO(P, NBPOP, nvar, nobj);
 						
-			% S = P U Q
-			%S = [P(:,1:nvar);Q];     %
 			S = [P(:,1:nvar);Q(:,1:nvar)];
 			
 			% AVALIAR POPULAÇÃO
@@ -101,10 +97,6 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			if mod(geracao,100) == 0
 				P
 			end
-			
-			%size(P)
-			
-			%P(:,ixRanking)
 			
 		end
 		
@@ -273,24 +265,11 @@ function flag = domina(U,V)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% NSGA - II
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function P = NSGA2(P, nbpop, nvar, nobj)
-	% Ordena população por frentes de não-dominância 
-	P = NSGA2_FastNonDominatedSort(P,nobj,nvar,nbpop*2);
-	
-	% Calcula distancia de multidão entre individuos da mesma frente
-	P = NSGA2_CrowdingDistance(P,nobj,nvar,nbpop);
-end
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % FAST NON DOMINATED SORTING
 % Ordena a População Baseado em Não Dominância
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function P = NSGA2_FastNonDominatedSort(P, nobj, nvar, nbpop)
+function P = NSGA_FastNonDominatedSort(P, nobj, nvar, nbpop)
 
     % Indivíduos não dominados recebem rank = 1;
     % Indivíduos da segunda fronteira recebem rank = 2;
@@ -380,6 +359,19 @@ function P = NSGA2_FastNonDominatedSort(P, nobj, nvar, nbpop)
        F(frente).f = Qf;
 
     end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% NSGA - II
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function P = NSGA2(P, nbpop, nvar, nobj)
+	% Ordena população por frentes de não-dominância 
+	P = NSGA_FastNonDominatedSort(P,nobj,nvar,nbpop*2);
+	
+	% Calcula distância de multidão entre individuos da mesma frente 
+	% e seleciona 50% dos melhores indivíduos em P
+	P = NSGA2_CrowdingDistance(P,nobj,nvar,nbpop);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -803,10 +795,10 @@ function PNew = GA_mutacao(POld, nbpop, nvar, pm)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% GA - Genetic Algorithm with real codification
+% Híbrido entre GA e EDA
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function Q = MIX(P,nbpop,nvar,nobj)
+function Q = HIBRIDO(P,nbpop,nvar,nobj)
 	ixRanking = nvar + nobj + 1;
 	if P(end,ixRanking) == 1
 		Q = EDA(P,nbpop,nvar);
@@ -818,27 +810,53 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % NSGA-III
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function z = pontoIdeal(P,nvar)
-	for i = 1:nvar
-		z(i) = min( P(:,i) );
-	end
+function P = NSGA3(P, nbpop, nvar, nobj)
+	% Ordena população por frentes de não-dominância 
+	P = NSGA_FastNonDominatedSort(P,nobj,nvar,nbpop*2);
+	
+	% Normaliza os objetivos
+	
+	% Associa com os nichos
 end
 
 
-function Z = normalizarObjetivos(P,nbpop,nvar)
+function objz = NSGA3_normalizarObjetivos(P,nbpop,nvar)
 	for i = 1:nvar
 		zmin(i) = min( P(:,i) );
 		zrng(i) = max( P(:,i) ) - zmin(i);
 	end
 	for k = 1:nbpop
 		for i = 1:nvar
-			Z(k,i) = (P(k,i) - zmin(i))/zrng(i)
+			objz(k,i) = (P(k,i) - zmin(i))/zrng(i)
 		end
 	end
 end
 
-function P = distanciaNichos(O,w)
-	
-end
+%Operação de Associação
+%Parâmetros de entrada: "pops": Funções objetivos "popz": Matriz dos pontos de referências
+%Parâmetros de saída: 
+%"qtd": Quantidade de soluções associadas ao ponto referencia
+%"dist": Solução com menor distância por função objetivo
 
+function [qtd dist d] = NSGA3_associaNichos(P,Z)
+    [n m] = size(Z);
+    d = [];
+    dist = [];
+    for i = 1:n
+        menor = Inf;
+        for j = 1:m
+            %Cálculo da distância de projeção entre a solução e o ponto de         %referência
+            temp = norm(P(i,:)'-Z(j,:)'*P(i,:)*Z(j,:)'./norm(Z(j,:)')^2);
+            if(temp < menor)
+               menor = temp;
+               indice = j;
+            end
+        %Matriz de distância da solução para o ponto de referência    
+        d(i,j)= temp;  
+        end
+        %Ponto em que a solução esta associado por frente de dominância
+        qtd(i,:) = indice;
+        %Solução com menor distância por função objetivo 
+        dist(i,:) = menor;
+    end
+end
