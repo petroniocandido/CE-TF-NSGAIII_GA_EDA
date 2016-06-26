@@ -84,7 +84,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			geracao = geracao + 1;
 			
 			%Q = EDA(P, NBPOP, nvar);
-			Q = GA(P, NBPOP, nvar, nobj)
+			Q = GA(P, NBPOP, nvar, nobj);
 			%Q = HIBRIDO(P, NBPOP, nvar, nobj);
 						
 			S = [P(:,1:nvar);Q(:,1:nvar)];
@@ -262,6 +262,24 @@ function flag = domina(U,V)
        flag = 2;
     end
     
+end
+
+function flag = ordem(U,V)
+    [~, no] = size(U);
+	u = 0;
+	v = 0;
+    for i = 1:no
+		if U(i) <= V(i)
+			u = u + 1;
+		else
+			v = v + 1;
+		end
+    end
+    if u >= v
+		flag = 1;
+	else
+		flag = -1;
+	end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -532,11 +550,12 @@ function Q = EDA(P,nbpop,nvar)
 	%Q = [Q1;Q2;Q3];
 	%pq1 = ceil(nbpop*0.5);
 	
-	%[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P,nvar)
-	%Q = EDA_gerarPopulacao_gaussUV(m1, s1, nbpop, nvar);
+	[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P,nvar)
+	Q = EDA_gerarPopulacao_gaussUV(m1, s1, nbpop, nvar);
+	%Q = EDA_gerarPopulacao_lognormUV(m1, s1, nbpop, nvar);
 	
-	[m1, s1] = EDA_estimarParametro_MediaDp_Global(P,nvar)
-	Q = EDA_gerarPopulacao_gaussUVGlobal(m1, s1, nbpop, nvar);
+	%[m1, s1] = EDA_estimarParametro_MediaDp_Global(P,nvar)
+	%Q = EDA_gerarPopulacao_gaussUVGlobal(m1, s1, nbpop, nvar);
 	
 	Q = max(min(Q,1),0);
 end
@@ -652,22 +671,22 @@ function Q = GA(P,nbpop,nvar,nobj)
 	ixRanking = nvar + nobj + 1;
 	
 	if P(end,ixRanking) == 1
-		Q = GA_selecao_torneio(P, nbpop, ixRanking, ps);
+		Q = GA_selecao_torneio(P, nbpop, nvar, nobj, ps);
 	else
 		% ELITISMO
 		Q1 = P(P(:,ixRanking) == 1, : );
-		P2 = P(P(:,ixRanking) > 1, : );
-		[l2 ~] = size(P2);
-
+		
 		% SELEÇÃO
-		Q2 = GA_selecao_torneio(P2, l2, ixRanking, ps);
+		P2 = P(P(:,ixRanking) > 1, : );
+		[l2 ~] = size(P2);		
+		Q2 = GA_selecao_torneio(P2, l2, nvar, nobj, ps);
 		
 		Q = [Q1 ; Q2];
 	end
 	
 	
 	% CRUZAMENTO
-	Q = GA_cruzamento(Q, nbpop, nvar, ixRanking, pc);
+	Q = GA_cruzamento(Q, nbpop, nvar, nobj, pc);
 	
 	Q = max(min(Q,1),0);
 	
@@ -680,7 +699,9 @@ function Q = GA(P,nbpop,nvar,nobj)
 end
 
 
-function [I, J] = GA_escolhe2(P,nbpop,ixRanking)
+function [I, J] = GA_escolhe2(P,nbpop,nvar, nobj)
+	ixObj = nvar +1 : nvar + nobj;
+	ixRanking = nvar + nobj + 1;
 	a = randi(nbpop);	
 	b = randi(nbpop);
 	
@@ -692,19 +713,29 @@ function [I, J] = GA_escolhe2(P,nbpop,ixRanking)
 	if P(a,ixRanking) < P(b,ixRanking)
 		I = a;
 		J = b;
+	elseif P(a,ixRanking) == P(b,ixRanking)
+		if ordem(P(a,ixObj),P(b,ixObj)) > 0
+			I = a;
+			J = b;
+		else
+			I = b;
+			J = a;
+		end
 	else
 		I = b;
 		J = a;
 	end
 end
 
-function PNew = GA_selecao_torneio(POld, nbpop, ixRanking, ps)
+function PNew = GA_selecao_torneio(POld, nbpop, nvar, nobj, ps)
     num_selecionados = nbpop * ps;
+    
+    PNew = [];
     
     k = 0.9;
     
     for ix = 1:num_selecionados
-		[i,j] = GA_escolhe2(POld,nbpop,ixRanking);
+		[i,j] = GA_escolhe2(POld,nbpop,nvar,nobj);
 		r = rand();
 		if r < k
 			PNew(ix,:) = POld(i,:);
@@ -714,8 +745,10 @@ function PNew = GA_selecao_torneio(POld, nbpop, ixRanking, ps)
     end
 end
 
-function PNew = GA_cruzamento(POld, nbpop, nvar, ixRanking, pc)
+function PNew = GA_cruzamento(POld, nbpop, nvar, nobj, pc)
 	PNew = POld;
+    
+    ixRanking = nvar + nobj + 1;
     
     [r, c] = size(POld);
     
@@ -731,7 +764,7 @@ function PNew = GA_cruzamento(POld, nbpop, nvar, ixRanking, pc)
 		
 		kcross = randi([1, nvar]);	% Ponto de corte
 		
-		[i,j] = GA_escolhe2(POld,nbpop,ixRanking);
+		[i,j] = GA_escolhe2(POld,nbpop,nvar,nobj);
 		
 		if dir == 0
 			tmp1 = (alpha_pol * POld(i, 1:kcross)) + ((1-alpha_pol) * POld(j, 1:kcross));

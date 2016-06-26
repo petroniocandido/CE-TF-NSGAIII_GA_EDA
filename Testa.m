@@ -3,7 +3,7 @@ clear all;
 close all;
 clc;
 
-nexec = 3;
+nexec = 5;
 
 % Definir problema [optP] e numero de objetivos [nobj]
 % optP: 1 - DTLZ1 / Outros - DTLZ2
