@@ -54,7 +54,9 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 	
 	NCOL = nvar + nobj + 2;
 	
-	% Ìndices da matriz P
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	% Ìndices dos campos na matriz P
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	
 	ixVariaveis = 1 : nvar;
 	
@@ -66,6 +68,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 	ngen= round(naval/NBPOP);
 
 	for Solucao=1:nexec
+	
 		% GERAR POPULAÇÃO INICIAL
 		P = rand(NBPOP*2,nvar); 
 		
@@ -74,6 +77,10 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		
 		P = [P ; P];
 		
+		% Habilitar o NSGA-II
+		% P = NSGA2(P, NBPOP, nvar, nobj);
+		
+		% Habilitar o NSGA-III
 		P = NSGA3(P, NBPOP, nvar, nobj);
 		
 		geracao = 0;
@@ -81,15 +88,32 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		while geracao <= ngen 
 			geracao = geracao + 1;
 			
+			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+			% MECANISMO EVOLUCIONÁRIO
+			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+			
+			% Habilitar o EDA
 			%Q = EDA(P, NBPOP, nvar);
+			
+			% Habilitar o GA
 			Q = GA(P, NBPOP, nvar, nobj);
+			
+			% Habilitar o modo híbrido (GA e EDA)
 			%Q = HIBRIDO(P, NBPOP, nvar, nobj);
 						
 			S = [P(:,1:nvar);Q(:,1:nvar)];
 			
 			% AVALIAR POPULAÇÃO
 			S = avaliarPopulacao(S, NBPOP*2, nvar, nobj, problema);
+
+			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+			% MECANISMO MULTIOBJETIVO
+			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 			
+			% Habilitar o NSGA-II
+			% P = NSGA2(S, NBPOP, nvar, nobj);
+			
+			% Habilitar o NSGA-III
 			P = NSGA3(S, NBPOP, nvar, nobj);
 			
 			if mod(geracao,100) == 0
@@ -97,6 +121,10 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			end
 			
 		end
+		
+		%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		% GERAR ESTATÍSTICAS DA EXECUÇÃO
+		%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		
 		% verifica o número de soluções não dominadas finais obtidas
 		if P(end,ixRanking) == 1
@@ -122,13 +150,6 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);       
 		end   
 			
-	%     % plota solução final
-	%     figure()
-	%     hold off
-	%     plot3(sol_obj(:,1),sol_obj(:,2),sol_obj(:,3),'or');
-	%     hold on
-	%     plot3(fronteiraReal(:,1),fronteiraReal(:,2),fronteiraReal(:,3),'*b');
-		
 		sfinal(Solucao).var = solucoes_var;
 		sfinal(Solucao).obj = solucoes_obj;
 		
@@ -137,8 +158,10 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
     end
     %  Retorna atributos requisitados:
     
-    % a) melhor solução
+    % Melhor IGD
     [igd_max,id] = min(igd);        
+    
+    % Melhor população (variáveis e objetivos)
     xBest = sfinal(id).var;        % variáveis    
     yBest = sfinal(id).obj;        % objetivos 
     
@@ -162,7 +185,7 @@ function P  = geraPopulacaoInicial(nbpop, nvar, ncol)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% [Pnew] = avaliarPopulacao(Pold, nbpop, nvar, nobj, tipo) 
+% Calcula os valores das funções objetivos
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function P = avaliarPopulacao(P, nbpop, nvar, nobj, tipo) 
@@ -280,9 +303,6 @@ function flag = ordem(U,V)
 	end
 end
 
-
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Funcao para Cálculo da Distância Geracional Invertida (IGD)
 % pareto - Soluções da Fronteira de Pareto
@@ -291,10 +311,6 @@ end
 
 function igd = IGD(pareto, solucao)
     
-    % entradas:
-    % pareto - Soluções da Fronteira de Pareto
-    % solucao - Soluções não dominadas obtidas pelo algoritmo em teste
-
     % núm. de soluções da fronteira de Pareto
     [npareto,~] = size(pareto);
     
@@ -425,37 +441,6 @@ function P = EDA_gerarPopulacao_gaussUVGlobal(mu, sigma,nbpop,nvar)
 		end
 	end
 end
-
-% Função de Probabilidade baseada em Gausiana Normal
-function [m] = EDA_prob1(mx,p,nvar,nBpop)
-    desv = std(mx(:,1:nvar));
-    med = mean(mx(:,1:nvar));
-    liminf = max((med-desv*1),0);
-    limsup = min((med+desv*1),1);
-    for i=1:nvar
-        if i==1
-            m_prob = unifrnd(liminf(1,i),limsup(1,i),round(nBpop*p),1);
-        else
-            m_prob = [m_prob unifrnd(liminf(1,i),limsup(1,i),round(nBpop*p),1)];
-        end
-    end
-    m = m_prob;
-end
-
-% Função de Probabilidade baseada em LogNormal
-function [m] = EDA_prob2(mx,p,nvar,nBpop)
-    desv = std(mx(:,1:nvar));
-    med = mean(mx(:,1:nvar));
-    for i=1:round(nBpop*p)
-        if i==1
-            m_prob = min(lognrnd(med,desv),1)*(rand);
-        else
-            m_prob(i,:) = min(lognrnd(med,desv),1)*(rand);
-        end
-    end
-    m = m_prob;
-end
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % GA - Genetic Algorithm with real codification
