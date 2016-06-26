@@ -474,12 +474,20 @@ end
 
 function igd = IGD(pareto, solucao)
     
-    npareto = length(pareto);   % núm. de soluções da fronteira de Pareto
-    nsol = length(solucao);     % núm. de soluções obtidas pelo algoritmo desenvolvido
+    % entradas:
+    % pareto - Soluções da Fronteira de Pareto
+    % solucao - Soluções não dominadas obtidas pelo algoritmo em teste
+
+    % núm. de soluções da fronteira de Pareto
+    [npareto,~] = size(pareto);
+    
+    % núm. de soluções obtidas pelo algoritmo desenvolvido
+    [nsol,~] = size(solucao);
     
     dmin = zeros(1,npareto);    % guarda menores distâncias (di) entre a fronteira pareto e as soluções não dominadas
-    d = zeros(nsol,npareto);    % dist. euclidiana entre cada ponto da fronteira pareto e cada solução não dominada
-    
+   
+    d = zeros(npareto,nsol);    % dist. euclidiana entre cada ponto da fronteira pareto e cada solução não dominada
+ 
     % calcula distância euclidiana ponto a ponto
     for i=1:npareto
         for j=1:nsol            
@@ -817,6 +825,12 @@ function P = NSGA3(P, nbpop, nvar, nobj)
 	% Normaliza os objetivos
 	
 	% Associa com os nichos
+	
+	[qtd dist d] = NSGA3_associarNichos(P,Z);
+	
+	% Preservar nichos
+	
+	P = NSGA3_preservarNichos(P);
 end
 
 
@@ -838,7 +852,7 @@ end
 %"qtd": Quantidade de soluções associadas ao ponto referencia
 %"dist": Solução com menor distância por função objetivo
 
-function [qtd dist d] = NSGA3_associaNichos(P,Z)
+function [qtd dist d] = NSGA3_associarNichos(P,Z)
     [n m] = size(Z);
     d = [];
     dist = [];
@@ -859,4 +873,8 @@ function [qtd dist d] = NSGA3_associaNichos(P,Z)
         %Solução com menor distância por função objetivo 
         dist(i,:) = menor;
     end
+end
+
+
+function P = NSGA3_preservarNichos(P)
 end
