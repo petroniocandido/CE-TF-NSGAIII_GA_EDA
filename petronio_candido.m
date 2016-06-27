@@ -96,10 +96,14 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			%Q = EDA(P, NBPOP, nvar);
 			
 			% Habilitar o GA
-			Q = GA(P, NBPOP, nvar, nobj);
+			%Q = GA(P, NBPOP, nvar, nobj);
 			
 			% Habilitar o modo híbrido (GA e EDA)
-			%Q = HIBRIDO(P, NBPOP, nvar, nobj);
+			Q = HIBRIDO(P, NBPOP, nvar, nobj);
+			
+			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+			% JUNTANDO PAIS E FILHOS E AVALIANDO 
+			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 						
 			S = [P(:,1:nvar);Q(:,1:nvar)];
 			
@@ -342,17 +346,17 @@ end
 
 function Q = EDA(P,nbpop,nvar)
 	% SELEÇÃO
-	%ind = 1:ceil(nbpop*0.2);
+	ind = 1:ceil(nbpop*0.5);
 	%m1 = max(ind);
-	%ind2 = length(ind)+1:(length(ind)+ceil(NBPOP*0.2)); 
-	%ind2 = m1+1:2*m1;
+	%ind1 = length(ind)+1:(length(ind)+ceil(NBPOP*0.5)); 
+	ind2 = numel(ind)+1:nbpop; %2*m1;
 	%ind3 = 2*m1+1:nbpop;
 
 	% EDA
 	%Q1 = prob1(P(ind,:),0.5,nvar,NBPOP);
 	%Q2 = prob1(P(ind2,:),0.5,nvar,NBPOP);
-	%[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind,:),nvar)
-	%[m2, s2] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind2,:),nvar)
+	[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind,:),nvar);
+	[m2, s2] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind2,:),nvar);
 	%[m3, s3] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind3,:),nvar)
 	%[ma1, mi1] = estimarParametro_MaxMin(P(ind,:),nvar);
 	%[ma2, mi2] = estimarParametro_MaxMin(P(ind2,:),nvar);
@@ -361,12 +365,15 @@ function Q = EDA(P,nbpop,nvar)
 	%Q1 = EDA_gerarPopulacao_gaussUVGlobal(m1, s1, pq1,nvar);
 	%Q2 = EDA_gerarPopulacao_gaussUVGlobal(m2, s2, pq2,nvar);
 	%Q3 = EDA_gerarPopulacao_gaussUVGlobal(m3, s3, nbpop - pq1 - pq2,nvar);
+	Q1 = EDA_gerarPopulacao_gaussUV(m1, s1, numel(ind), nvar);
+	Q2 = EDA_gerarPopulacao_unifMDP(m2-s2, m2+s2, numel(ind2), nvar);
 	
-	%Q = [Q1;Q2;Q3];
+	Q = [Q1;Q2]; %;Q3];
 	%pq1 = ceil(nbpop*0.5);
 	
-	[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P,nvar)
-	Q = EDA_gerarPopulacao_gaussUV(m1, s1, nbpop, nvar);
+	%[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P,nvar)
+	%Q = EDA_gerarPopulacao_gaussUV(m1, s1, nbpop, nvar);
+	%Q = EDA_gerarPopulacao_gaussUV(m1, s1, nbpop, nvar);
 	%Q = EDA_gerarPopulacao_lognormUV(m1, s1, nbpop, nvar);
 	
 	%[m1, s1] = EDA_estimarParametro_MediaDp_Global(P,nvar)
@@ -512,16 +519,12 @@ function [I, J] = GA_escolhe2(P,nbpop,nvar, nobj)
 end
 
 function PNew = GA_selecao_torneio(POld, nbpop, nvar, nobj, ps)
-    num_selecionados = nbpop * ps;
-    
     PNew = [];
     
-    k = 0.9;
-    
-    for ix = 1:num_selecionados
+    for ix = 1:nbpop
 		[i,j] = GA_escolhe2(POld,nbpop,nvar,nobj);
 		r = rand();
-		if r < k
+		if r < ps
 			PNew(ix,:) = POld(i,:);
 		else
 			PNew(ix,:) = POld(j,:);
@@ -630,6 +633,23 @@ function Q = HIBRIDO(P,nbpop,nvar,nobj)
 	else
 		Q = GA(P,nbpop,nvar,nobj);
 	end
+	
+	%ind1 = 1:ceil(nbpop*0.5);
+	%ind2 = numel(ind1)+1:nbpop;
+	
+	%Q1 = GA_selecao_torneio(P(ind1,:), numel(ind1), nvar, nobj, 0.7);
+	
+	%[m2, s2] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind2,:),nvar);
+	%Q2 = EDA_gerarPopulacao_gaussUV(m2-s2, m2+s2, numel(ind2), nvar);
+	
+	%Q = [Q1;Q2];
+	
+	%Q = GA_cruzamento(Q, nbpop, nvar, nobj, 0.7);
+	
+	% MUTAÇÃO	
+	%Q = GA_mutacao(Q, nbpop, nvar, 0.4);
+	
+	Q = max(min(Q,1),0);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
