@@ -74,19 +74,17 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		
 		% AVALIAR POPULAÇÃO INICIAL
 		P = avaliarPopulacao(P, NBPOP*2, nvar, nobj, problema);
-		
-		P = [P ; P];
-		
+				
 		% Habilitar o NSGA-II
 		% P = NSGA2(P, NBPOP, nvar, nobj);
 		
 		% Habilitar o NSGA-III
-		P = NSGA3(P, NBPOP, nvar, nobj);
+		P = NSGA3(P, NBPOP, nvar, nobj)
 		
 		geracao = 0;
 		
 		while geracao <= ngen 
-			geracao = geracao + 1;
+			geracao = geracao + 1
 			
 			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 			% MECANISMO EVOLUCIONÁRIO
@@ -96,8 +94,8 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			%Q = EDA(P, NBPOP, nvar);
 			
 			% Habilitar o GA
-			%Q = GA(P, NBPOP, nvar, nobj);
-			
+			% Q = GA(P, NBPOP, nvar, nobj);
+		
 			% Habilitar o modo híbrido (GA e EDA)
 			Q = HIBRIDO(P, NBPOP, nvar, nobj);
 			
@@ -637,18 +635,18 @@ function Q = HIBRIDO(P,nbpop,nvar,nobj)
 	%ind1 = 1:ceil(nbpop*0.5);
 	%ind2 = numel(ind1)+1:nbpop;
 	
-	%Q1 = GA_selecao_torneio(P(ind1,:), numel(ind1), nvar, nobj, 0.7);
+	%tq1 = numel(ind1);
+		
+	%Q1 = GA_selecao_torneio(P(ind1,:), tq1, nvar, nobj, 0.7);
+	%Q1 = GA_cruzamento(Q1, tq1, nvar, nobj, 0.7);
+	%Q1 = GA_mutacao(Q1, tq1, nvar, 0.4);
 	
 	%[m2, s2] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind2,:),nvar);
-	%Q2 = EDA_gerarPopulacao_gaussUV(m2-s2, m2+s2, numel(ind2), nvar);
+	%Q2 = EDA_gerarPopulacao_gaussUV(m2, s2, floor(numel(ind2)/2), nvar);
+	%Q3 = EDA_gerarPopulacao_unif(m2-s2, m2+s2, ceil(numel(ind2)/2), nvar);
 	
-	%Q = [Q1;Q2];
-	
-	%Q = GA_cruzamento(Q, nbpop, nvar, nobj, 0.7);
-	
-	% MUTAÇÃO	
-	%Q = GA_mutacao(Q, nbpop, nvar, 0.4);
-	
+	%Q = [Q1(:,1:nvar);Q2(:,1:nvar);Q3(:,1:nvar)];
+		
 	Q = max(min(Q,1),0);
 end
 
@@ -929,6 +927,14 @@ function [P Z] = NSGA3_associarNichos(P,Z,nbpop,nvar,nobj)
     
     ixZObj = 1:nobj;
     
+    ixNicho = nvar+nobj+2;
+    
+    ixQtdSolucoes = nobj + 1;
+    
+    ixMenorDistancia = ixQtdSolucoes + 1;
+    
+    ixSolucaoMaisProxima = ixMenorDistancia + 1;
+    
     % Normaliza os objetivos
     Pz = NSGA3_normalizarObjetivos(P,nbpop*2,nvar,nobj);
     
@@ -952,25 +958,25 @@ function [P Z] = NSGA3_associarNichos(P,Z,nbpop,nvar,nobj)
         end
         
         %Ponto em que a solução esta associado por frente de dominância
-        P(i,nvar+nobj+2) = indice;
+        P(i,ixNicho) = indice;
         
         % Incrementa o contador de soluções associadas ao nicho
-        Z(indice,nobj + 1) = Z(indice,nobj + 1) + 1;
+        Z(indice,ixQtdSolucoes) = Z(indice,ixQtdSolucoes) + 1;
         
         % Verifica a distância do nicho mais próximo e armazena o índice
-        if Z(indice,nobj + 2) > d(i,indice)
-			Z(indice,nobj + 2) = d(i,indice);
-			Z(indice,nobj + 3) = i;
+        if Z(indice,ixMenorDistancia) > d(i,indice)
+			Z(indice,ixMenorDistancia) = d(i,indice);
+			Z(indice,ixSolucaoMaisProxima) = i;
         end
         
         %Solução com menor distância por função objetivo 
         dist(i,:) = menor;
     end
     
-    nichos_vazios =  find(Z(:,nobj + 1) == 0);
+    nichos_vazios =  find(Z(:,ixQtdSolucoes) == 0);
     
     for j = 1:numel(nichos_vazios)
-		Z(nichos_vazios(j),nobj+3) = find(d(:,nichos_vazios(j)) == min(d(:,nichos_vazios(j))),1);
+		Z(nichos_vazios(j),ixSolucaoMaisProxima) = find(d(:,nichos_vazios(j)) == min(d(:,nichos_vazios(j))),1);
     end
     
 end
@@ -984,6 +990,8 @@ function Pnew = NSGA3_preservarNichos(Pold, Z, nvar, nobj, nsel)
     ixRanking = nvar + nobj + 1;   
     
     ixNicho = ixRanking + 1; 
+    
+    ixSolucaoMaisProxima = nobj + 3;
 
     % ordena individuos da população conforme nível de dominância
     [~,indice_fr] = sort(Pold(:,ixRanking));
@@ -1005,7 +1013,7 @@ function Pnew = NSGA3_preservarNichos(Pold, Z, nvar, nobj, nsel)
     
     % Inclui o elemento mais próximo dos nichos com menos representantes
     for k = 1:nsel-t
-		Pnew(k+t, :) = Pold( Z(nichos(k), nobj+3), :); 
+		Pnew(k+t, :) = Pold( Z(nichos(k), ixSolucaoMaisProxima), :); 
     end
     
 end
