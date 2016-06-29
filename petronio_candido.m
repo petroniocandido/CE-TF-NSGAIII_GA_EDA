@@ -94,10 +94,10 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			%Q = EDA(P, NBPOP, nvar);
 			
 			% Habilitar o GA
-			% Q = GA(P, NBPOP, nvar, nobj);
+			Q = GA(P, NBPOP, nvar, nobj);
 		
 			% Habilitar o modo híbrido (GA e EDA)
-			Q = HIBRIDO(P, NBPOP, nvar, nobj);
+			%Q = HIBRIDO(P, NBPOP, nvar, nobj);
 			
 			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 			% JUNTANDO PAIS E FILHOS E AVALIANDO 
@@ -132,25 +132,18 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		if P(end,ixRanking) == 1
 			nnd = NBPOP;
 		else
-			nnd = find(P(:,ixRanking)>1,1)-1
-		end
+			nnd = find(P(:,nvar+nobj+1)>1,1)-1;   
 			
+			if nnd == 0
+				nnd = NBPOP;
+			end			
+		end
+		
 		solucoes_var = P(1:nnd,ixVariaveis);  % valores das variáveis de busca para a solução final
 		solucoes_obj = P(1:nnd,ixObjetivos);  % variáveis da solução final
 				
 		% Calcula IGD das Soluções
-		if problema == 1 && nobj==3        
-		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
-
-		elseif problema == 1 && nobj==5        
-		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
-		   
-		elseif problema ~= 1 && nobj==3          
-		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
-		   
-		else
-		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);       
-		end   
+		igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
 			
 		sfinal(Solucao).var = solucoes_var;
 		sfinal(Solucao).obj = solucoes_obj;
@@ -364,7 +357,7 @@ function Q = EDA(P,nbpop,nvar)
 	%Q2 = EDA_gerarPopulacao_gaussUVGlobal(m2, s2, pq2,nvar);
 	%Q3 = EDA_gerarPopulacao_gaussUVGlobal(m3, s3, nbpop - pq1 - pq2,nvar);
 	Q1 = EDA_gerarPopulacao_gaussUV(m1, s1, numel(ind), nvar);
-	Q2 = EDA_gerarPopulacao_unifMDP(m2-s2, m2+s2, numel(ind2), nvar);
+	Q2 = EDA_gerarPopulacao_unif(m2-s2, m2+s2, numel(ind2), nvar);
 	
 	Q = [Q1;Q2]; %;Q3];
 	%pq1 = ceil(nbpop*0.5);
@@ -915,19 +908,21 @@ function objz = NSGA3_normalizarObjetivos(P,nbpop,nvar,nobj)
 	end
 end
 
-%Operação de Associação
-%Parâmetros de entrada: "pops": Funções objetivos "popz": Matriz dos pontos de referências
-%Parâmetros de saída: 
-%"qtd": Quantidade de soluções associadas ao ponto referencia
-%"dist": Solução com menor distância por função objetivo
+% Associa um nicho à cada solução de P
+%	P: valores das funções objetivo 
+%	Z: Pontos de referências (NICHOS)
 
 function [P Z] = NSGA3_associarNichos(P,Z,nbpop,nvar,nobj)
     
+    % Ìndices dos elementos na matriz P
+    
     ixObj = nvar+1 : nvar+nobj;
     
-    ixZObj = 1:nobj;
-    
     ixNicho = nvar+nobj+2;
+    
+    % Índices dos elementos na matriz Z
+    
+    ixZObj = 1:nobj;
     
     ixQtdSolucoes = nobj + 1;
     

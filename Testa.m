@@ -9,8 +9,8 @@ nexec = 3;
 % optP: 1 - DTLZ1 / Outros - DTLZ2
 % nobj: 3 ou 5 objetivos
 
-for optP = [2]
-    for nobj = [5]
+for optP = [1]
+    for nobj = [3]
         
         % define número de cálculos (baseado no artigo Deb & Jain)
         if (optP == 1)
