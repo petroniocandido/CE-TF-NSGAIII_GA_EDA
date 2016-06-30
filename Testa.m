@@ -3,14 +3,14 @@ clear all;
 close all;
 clc;
 
-nexec = 8;
+nexec = 5;
 
 % Definir problema [optP] e numero de objetivos [nobj]
 % optP: 1 - DTLZ1 / Outros - DTLZ2
 % nobj: 3 ou 5 objetivos
 
 for optP = [1]
-    for nobj = [5]
+    for nobj = [3]
         
         % define número de cálculos (baseado no artigo Deb & Jain)
         if (optP == 1)

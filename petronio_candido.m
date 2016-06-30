@@ -65,7 +65,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 	ixRanking = nvar + nobj + 1;
 	
 	% número de gerações
-	ngen= 250; %round(naval/NBPOP);
+	ngen= 	round(naval/NBPOP);
 
 	for Solucao=1:nexec
 	
@@ -74,17 +74,18 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		
 		% AVALIAR POPULAÇÃO INICIAL
 		P = avaliarPopulacao(P, NBPOP*2, nvar, nobj, problema);
-				
+		
+		
 		% Habilitar o NSGA-II
 		% P = NSGA2(P, NBPOP, nvar, nobj);
 		
 		% Habilitar o NSGA-III
-		P = NSGA3(P, NBPOP, nvar, nobj)
+		P = NSGA3(P, NBPOP, nvar, nobj);
 		
 		geracao = 0;
 		
 		while geracao <= ngen 
-			geracao = geracao + 1
+			geracao = geracao + 1;
 			
 			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 			% MECANISMO EVOLUCIONÁRIO
@@ -94,10 +95,10 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			%Q = EDA(P, NBPOP, nvar);
 			
 			% Habilitar o GA
-			Q = GA(P, NBPOP, nvar, nobj);
-		
+			%Q = GA(P, NBPOP, nvar, nobj);
+			
 			% Habilitar o modo híbrido (GA e EDA)
-			%Q = HIBRIDO(P, NBPOP, nvar, nobj);
+			Q = HIBRIDO(P, NBPOP, nvar, nobj);
 			
 			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 			% JUNTANDO PAIS E FILHOS E AVALIANDO 
@@ -132,18 +133,30 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		if P(end,ixRanking) == 1
 			nnd = NBPOP;
 		else
-			nnd = find(P(:,nvar+nobj+1)>1,1)-1;   
+			nnd = find(P(:,ixRanking)>1,1)-1
 			
 			if nnd == 0
-				nnd = NBPOP;
-			end			
+				nnd = NBPOP
+			end
+			
 		end
-		
+			
 		solucoes_var = P(1:nnd,ixVariaveis);  % valores das variáveis de busca para a solução final
 		solucoes_obj = P(1:nnd,ixObjetivos);  % variáveis da solução final
 				
 		% Calcula IGD das Soluções
-		igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
+		if problema == 1 && nobj==3        
+		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
+
+		elseif problema == 1 && nobj==5        
+		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
+		   
+		elseif problema ~= 1 && nobj==3          
+		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);
+		   
+		else
+		   igd(Solucao) = IGD(fronteiraReal, solucoes_obj);       
+		end   
 			
 		sfinal(Solucao).var = solucoes_var;
 		sfinal(Solucao).obj = solucoes_obj;
@@ -336,14 +349,39 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function Q = EDA(P,nbpop,nvar)
+	% SELEÇÃO
 	ind = 1:ceil(nbpop*0.5);
+	%m1 = max(ind);
+	%ind1 = length(ind)+1:(length(ind)+ceil(NBPOP*0.5)); 
 	ind2 = numel(ind)+1:nbpop; %2*m1;
+	%ind3 = 2*m1+1:nbpop;
+
+	% EDA
+	%Q1 = prob1(P(ind,:),0.5,nvar,NBPOP);
+	%Q2 = prob1(P(ind2,:),0.5,nvar,NBPOP);
 	[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind,:),nvar);
 	[m2, s2] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind2,:),nvar);
+	%[m3, s3] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind3,:),nvar)
+	%[ma1, mi1] = estimarParametro_MaxMin(P(ind,:),nvar);
+	%[ma2, mi2] = estimarParametro_MaxMin(P(ind2,:),nvar);
+	%pq1 = ceil(nbpop*0.6);
+	%pq2 = ceil(nbpop*0.3);
+	%Q1 = EDA_gerarPopulacao_gaussUVGlobal(m1, s1, pq1,nvar);
+	%Q2 = EDA_gerarPopulacao_gaussUVGlobal(m2, s2, pq2,nvar);
+	%Q3 = EDA_gerarPopulacao_gaussUVGlobal(m3, s3, nbpop - pq1 - pq2,nvar);
 	Q1 = EDA_gerarPopulacao_gaussUV(m1, s1, numel(ind), nvar);
-	Q2 = EDA_gerarPopulacao_unif(m2-s2, m2+s2, numel(ind2), nvar);
+	Q2 = EDA_gerarPopulacao_unifMDP(m2-s2, m2+s2, numel(ind2), nvar);
 	
 	Q = [Q1;Q2]; %;Q3];
+	%pq1 = ceil(nbpop*0.5);
+	
+	%[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P,nvar)
+	%Q = EDA_gerarPopulacao_gaussUV(m1, s1, nbpop, nvar);
+	%Q = EDA_gerarPopulacao_gaussUV(m1, s1, nbpop, nvar);
+	%Q = EDA_gerarPopulacao_lognormUV(m1, s1, nbpop, nvar);
+	
+	%[m1, s1] = EDA_estimarParametro_MediaDp_Global(P,nvar)
+	%Q = EDA_gerarPopulacao_gaussUVGlobal(m1, s1, nbpop, nvar);
 	
 	Q = max(min(Q,1),0);
 end
@@ -594,32 +632,27 @@ end
 
 function Q = HIBRIDO(P,nbpop,nvar,nobj)
 	ixRanking = nvar + nobj + 1;
-	
-	% HIBRIDISMO POR FASE
-	
 	if P(end,ixRanking) == 1
 		Q = EDA(P,nbpop,nvar);
 	else
 		Q = GA(P,nbpop,nvar,nobj);
 	end
 	
-	% HIBRIDISMO POR SUBPOPULAÇÃO
-	
 	%ind1 = 1:ceil(nbpop*0.5);
 	%ind2 = numel(ind1)+1:nbpop;
 	
-	%tq1 = numel(ind1);
-		
-	%Q1 = GA_selecao_torneio(P(ind1,:), tq1, nvar, nobj, 0.7);
-	%Q1 = GA_cruzamento(Q1, tq1, nvar, nobj, 0.7);
-	%Q1 = GA_mutacao(Q1, tq1, nvar, 0.4);
+	%Q1 = GA_selecao_torneio(P(ind1,:), numel(ind1), nvar, nobj, 0.7);
 	
 	%[m2, s2] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind2,:),nvar);
-	%Q2 = EDA_gerarPopulacao_gaussUV(m2, s2, floor(numel(ind2)/2), nvar);
-	%Q3 = EDA_gerarPopulacao_unif(m2-s2, m2+s2, ceil(numel(ind2)/2), nvar);
+	%Q2 = EDA_gerarPopulacao_gaussUV(m2-s2, m2+s2, numel(ind2), nvar);
 	
-	%Q = [Q1(:,1:nvar);Q2(:,1:nvar);Q3(:,1:nvar)];
-		
+	%Q = [Q1;Q2];
+	
+	%Q = GA_cruzamento(Q, nbpop, nvar, nobj, 0.7);
+	
+	% MUTAÇÃO	
+	%Q = GA_mutacao(Q, nbpop, nvar, 0.4);
+	
 	Q = max(min(Q,1),0);
 end
 
@@ -853,6 +886,12 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function P = NSGA3(P, nbpop, nvar, nobj)
+
+	ixObj = nvar + 1 : nvar + nobj;
+	
+	ixRanking = nvar + nobj + 1;
+	
+	ixNicho = ixRanking + 1;
 	
 	Z = NSGA3_carregaPontosReferencia(nobj);
 
@@ -860,10 +899,11 @@ function P = NSGA3(P, nbpop, nvar, nobj)
 	P = NSGA_FastNonDominatedSort(P,nobj,nvar,nbpop*2);
 	
 	% Associa com os nichos
-	[P Z] = NSGA3_associarNichos(P,Z,nbpop,nvar,nobj);
+	[P Z d] = NSGA3_associarNichos(P,Z,nbpop,nvar,nobj);
 	
-	% Seleciona soluções preservando os nichos
-	P = NSGA3_preservarNichos(P, Z, nvar, nobj, nbpop);
+	% Preservar nichos
+	
+	P = NSGA3_preservarNichos(P, Z, d, nvar, nobj, nbpop);
 end
 
 
@@ -881,41 +921,20 @@ function objz = NSGA3_normalizarObjetivos(P,nbpop,nvar,nobj)
 	end
 end
 
-% Associa um nicho à cada solução de P
-%	P: valores das funções objetivo 
-%	Z: Pontos de referências (NICHOS)
+%Operação de Associação
+%Parâmetros de entrada: "pops": Funções objetivos "popz": Matriz dos pontos de referências
+%Parâmetros de saída: 
+%"qtd": Quantidade de soluções associadas ao ponto referencia
+%"dist": Solução com menor distância por função objetivo
 
-function [P Z] = NSGA3_associarNichos(P,Z,nbpop,nvar,nobj)
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Ìndices dos elementos na matriz P
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [P Z d] = NSGA3_associarNichos(P,Z,nbpop,nvar,nobj)
     
     ixObj = nvar+1 : nvar+nobj;
     
-    ixNicho = nvar+nobj+2;
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Índices dos elementos na matriz Z
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
     ixZObj = 1:nobj;
     
-    ixQtdSolucoes = nobj + 1;
-    
-    ixMenorDistancia = ixQtdSolucoes + 1;
-    
-    ixSolucaoMaisProxima = ixMenorDistancia + 1;
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Normaliza os objetivos
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
     Pz = NSGA3_normalizarObjetivos(P,nbpop*2,nvar,nobj);
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Associar nichos
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     d = [];
     dist = [];
@@ -937,57 +956,44 @@ function [P Z] = NSGA3_associarNichos(P,Z,nbpop,nvar,nobj)
         end
         
         %Ponto em que a solução esta associado por frente de dominância
-        P(i,ixNicho) = indice;
+        P(i,nvar+nobj+2) = indice;
         
         % Incrementa o contador de soluções associadas ao nicho
-        Z(indice,ixQtdSolucoes) = Z(indice,ixQtdSolucoes) + 1;
+        Z(indice,nobj + 1) = Z(indice,nobj + 1) + 1;
         
         % Verifica a distância do nicho mais próximo e armazena o índice
-        if Z(indice,ixMenorDistancia) > d(i,indice)
-			Z(indice,ixMenorDistancia) = d(i,indice);
-			Z(indice,ixSolucaoMaisProxima) = i;
+        if Z(indice,nobj + 2) > d(i,indice)
+			Z(indice,nobj + 2) = d(i,indice);
+			Z(indice,nobj + 3) = i;
         end
         
         %Solução com menor distância por função objetivo 
         dist(i,:) = menor;
     end
     
-    % Verifica se há nichos sem nenhuma solução associada
-    nichos_vazios =  find(Z(:,ixQtdSolucoes) == 0);
+    nichos_vazios =  find(Z(:,nobj + 1) == 0);
     
-    % Associa a solução menos distante ao nicho
     for j = 1:numel(nichos_vazios)
-		Z(nichos_vazios(j),ixSolucaoMaisProxima) = find(d(:,nichos_vazios(j)) == min(d(:,nichos_vazios(j))),1);
+		Z(nichos_vazios(j),nobj+3) = find(d(:,nichos_vazios(j)) == min(d(:,nichos_vazios(j))),1);
     end
     
 end
 
-% Associa um nicho à cada solução de P
-%	Pold: População de pais e filhos
-%	Pnew: nova população, após a seleção de frentes e preservação de nichos
-%	Z: Pontos de referências (NICHOS)
-%	nvar: nº de variáveis
-%	nobj: nº de objetivos
-%	nsel: tamanho da nova população
-function Pnew = NSGA3_preservarNichos(Pold, Z, nvar, nobj, nsel)
+
+function Pnew = NSGA3_preservarNichos(Pold, Z, d, nvar, nobj, nsel)
 	
 	Pnew = [];
 	
 	% posição com informação do rank (número da frente de dominância)
     ixRanking = nvar + nobj + 1;   
     
-    % posição com informação do nicho na matriz P
     ixNicho = ixRanking + 1; 
-    
-    % posição com informação da solução mais próxima na matriz Z
-    ixSolucaoMaisProxima = nobj + 3;
 
     % ordena individuos da população conforme nível de dominância
     [~,indice_fr] = sort(Pold(:,ixRanking));
     Pold = Pold(indice_fr,:);
     
-    % ordena os nichos em ordem decrescente da quantidade de soluções associadas
-    [~,nichos] = sort(Z(:,nobj+1),'descend');
+    [~,nichos] = sort(Z(:,nobj+1),'ascend');
         
      % verifica qual a ultima frente de dominância a entrar diretamente na população de pais
     lastF =  Pold(nsel,ixRanking);
@@ -999,13 +1005,24 @@ function Pnew = NSGA3_preservarNichos(Pold, Z, nvar, nobj, nsel)
 		end
     end
     
-    % pega a quantidade de soluções que foram incluídas na nova população
     [t, ~] = size(Pnew);
     
     % Inclui o elemento mais próximo dos nichos com menos representantes
+    %for k = 1:nsel-t
+	%	Pnew(k+t, :) = Pold( Z(nichos(k), nobj+3), :); 
+    %end
+    
     for k = 1:nsel-t
-		Pnew(k+t, :) = Pold( Z(nichos(k), ixSolucaoMaisProxima), :); 
+		rank = Pold(k,ixRanking);
+		nicho = nichos(k);
+		frente = find(Pold(:,ixRanking) == rank);
+				
+		Pnew(k+t, :) = Pold(find(d(frente,nicho) == min(d(frente,nicho)),1),:);
     end
+    
+    % ordena individuos da população conforme nível de dominância
+    [~,indice_fr] = sort(Pnew(:,ixRanking));
+    Pnew = Pnew(indice_fr,:);
     
 end
 
