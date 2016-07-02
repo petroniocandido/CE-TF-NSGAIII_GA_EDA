@@ -75,12 +75,13 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 		% AVALIAR POPULAÇÃO INICIAL
 		P = avaliarPopulacao(P, NBPOP*2, nvar, nobj, problema);
 		
-		
+		d = zeros(NBPOP*2,NBPOP);
+				
 		% Habilitar o NSGA-II
 		% P = NSGA2(P, NBPOP, nvar, nobj);
 		
 		% Habilitar o NSGA-III
-		P = NSGA3(P, NBPOP, nvar, nobj);
+		[P, d] = NSGA3(P, NBPOP, nvar, nobj);
 		
 		geracao = 0;
 		
@@ -98,7 +99,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			%Q = GA(P, NBPOP, nvar, nobj);
 			
 			% Habilitar o modo híbrido (GA e EDA)
-			Q = HIBRIDO(P, NBPOP, nvar, nobj);
+			Q = HIBRIDO_Nichos(P, d, NBPOP, nvar, nobj);
 			
 			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 			% JUNTANDO PAIS E FILHOS E AVALIANDO 
@@ -117,7 +118,7 @@ function [xBest, yBest, igd_max, igd_mean, igd_min] = petronio_candido(naval, pr
 			% P = NSGA2(S, NBPOP, nvar, nobj);
 			
 			% Habilitar o NSGA-III
-			P = NSGA3(S, NBPOP, nvar, nobj);
+			[P, d] = NSGA3(S, NBPOP, nvar, nobj);
 			
 			if mod(geracao,100) == 0
 				P
@@ -351,8 +352,6 @@ end
 function Q = EDA(P,nbpop,nvar)
 	% SELEÇÃO
 	ind = 1:ceil(nbpop*0.5);
-	%m1 = max(ind);
-	%ind1 = length(ind)+1:(length(ind)+ceil(NBPOP*0.5)); 
 	ind2 = numel(ind)+1:nbpop; %2*m1;
 	%ind3 = 2*m1+1:nbpop;
 
@@ -361,28 +360,19 @@ function Q = EDA(P,nbpop,nvar)
 	%Q2 = prob1(P(ind2,:),0.5,nvar,NBPOP);
 	[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind,:),nvar);
 	[m2, s2] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind2,:),nvar);
-	%[m3, s3] = EDA_estimarParametro_MediaDp_PorVariavel(P(ind3,:),nvar)
-	%[ma1, mi1] = estimarParametro_MaxMin(P(ind,:),nvar);
-	%[ma2, mi2] = estimarParametro_MaxMin(P(ind2,:),nvar);
-	%pq1 = ceil(nbpop*0.6);
-	%pq2 = ceil(nbpop*0.3);
-	%Q1 = EDA_gerarPopulacao_gaussUVGlobal(m1, s1, pq1,nvar);
-	%Q2 = EDA_gerarPopulacao_gaussUVGlobal(m2, s2, pq2,nvar);
-	%Q3 = EDA_gerarPopulacao_gaussUVGlobal(m3, s3, nbpop - pq1 - pq2,nvar);
 	Q1 = EDA_gerarPopulacao_gaussUV(m1, s1, numel(ind), nvar);
 	Q2 = EDA_gerarPopulacao_unifMDP(m2-s2, m2+s2, numel(ind2), nvar);
 	
 	Q = [Q1;Q2]; %;Q3];
-	%pq1 = ceil(nbpop*0.5);
 	
-	%[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P,nvar)
-	%Q = EDA_gerarPopulacao_gaussUV(m1, s1, nbpop, nvar);
-	%Q = EDA_gerarPopulacao_gaussUV(m1, s1, nbpop, nvar);
-	%Q = EDA_gerarPopulacao_lognormUV(m1, s1, nbpop, nvar);
-	
-	%[m1, s1] = EDA_estimarParametro_MediaDp_Global(P,nvar)
-	%Q = EDA_gerarPopulacao_gaussUVGlobal(m1, s1, nbpop, nvar);
-	
+	Q = max(min(Q,1),0);
+end
+
+% Cria modelo um probabilístico para cada nicho e frente de dominância
+
+function Q = EDA_Nichos(P,nbpop,nvar,nobj)
+	[m1, s1] = EDA_estimarParametro_MediaDp_PorVariavel(P,nvar);
+	Q = EDA_gerarPopulacao_gaussUV(m1, s1, 1, nvar);
 	Q = max(min(Q,1),0);
 end
  
@@ -491,6 +481,31 @@ function Q = GA(P,nbpop,nvar,nobj)
 	Q = max(min(Q,1),0);
 	
 	
+end
+
+function Q = GA_Nichos(P,nbpop,nvar,nobj)
+
+	ps = 1;
+	pc = 0.9;
+	pm = 0.5;
+	
+	ixRanking = nvar + nobj + 1;
+	
+	% SELEÇÃO
+	Q1 = GA_selecao_torneio(P, nbpop, nvar, nobj, ps);
+	
+	% CRUZAMENTO
+	Q1 = GA_cruzamento(Q1, nbpop, nvar, nobj, pc);
+	
+	Q1 = max(min(Q1,1),0);
+	
+	% MUTAÇÃO	
+	Q1 = GA_mutacao(Q1, nbpop, nvar, pm);
+	
+	Q1 = max(min(Q1,1),0);
+	
+	Q = Q1(randi(nbpop,1),:);
+
 end
 
 
@@ -652,6 +667,43 @@ function Q = HIBRIDO(P,nbpop,nvar,nobj)
 	
 	% MUTAÇÃO	
 	%Q = GA_mutacao(Q, nbpop, nvar, 0.4);
+	
+	Q = max(min(Q,1),0);
+end
+
+function Q = HIBRIDO_Nichos(P,d,nbpop,nvar,nobj)
+	ixRanking = nvar + nobj + 1;
+	
+	if P(end,ixRanking) == 1
+		mecanismo = 1; % EDA
+	else
+		mecanismo = 2; % GA
+	end
+	
+	qtdSelecionados = floor(nbpop * 0.05);
+	
+	Q = [];
+
+	% Para cada nicho
+	for nicho = 1:nbpop
+		% Seleção das soluções mais próximas ao nicho
+		
+		tmp = [ P(1:nbpop,ixRanking), d(1:nbpop,nicho) ];
+		
+		[~, indice] = sortrows(tmp,[1,2]);
+		
+		ind = indice(1:qtdSelecionados);
+		
+		if mecanismo == 1 
+			Q1 = EDA_Nichos(P(ind,:),qtdSelecionados,nvar,nobj);
+		else
+			Q1 = GA_Nichos(P(ind,:),qtdSelecionados,nvar,nobj);
+		end
+		
+		Q = [Q ; Q1];
+	
+	end
+
 	
 	Q = max(min(Q,1),0);
 end
@@ -885,13 +937,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function P = NSGA3(P, nbpop, nvar, nobj)
-
-	ixObj = nvar + 1 : nvar + nobj;
-	
-	ixRanking = nvar + nobj + 1;
-	
-	ixNicho = ixRanking + 1;
+function [P,d] = NSGA3(P, nbpop, nvar, nobj)
 	
 	Z = NSGA3_carregaPontosReferencia(nobj);
 
@@ -902,10 +948,8 @@ function P = NSGA3(P, nbpop, nvar, nobj)
 	[P Z d] = NSGA3_associarNichos(P,Z,nbpop,nvar,nobj);
 	
 	% Preservar nichos
-	
 	P = NSGA3_preservarNichos(P, Z, d, nvar, nobj, nbpop);
 end
-
 
 function objz = NSGA3_normalizarObjetivos(P,nbpop,nvar,nobj)
 	objz = [];
